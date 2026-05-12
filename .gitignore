@@ -1,0 +1,6 @@
+node_modules/
+scores.json
+评分网址.txt
+.env
+.DS_Store
+Thumbs.db

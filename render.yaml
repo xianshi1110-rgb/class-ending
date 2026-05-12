@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: class-score-app
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: TEACHER_PIN
+        sync: false

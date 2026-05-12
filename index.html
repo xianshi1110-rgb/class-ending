@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>课堂汇报评分小程序</title>
+  <style>
+    :root {
+      --bg: #eef5ff;
+      --panel: #ffffff;
+      --ink: #202938;
+      --muted: #6e7785;
+      --line: #d8e0ea;
+      --blue: #0878ff;
+      --blue-dark: #055dc8;
+      --green: #1f9d67;
+      --orange: #f59e0b;
+      --shadow: 0 18px 45px rgba(20, 48, 87, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 8%, rgba(8, 120, 255, 0.15), transparent 32%),
+        linear-gradient(135deg, #f8fbff 0%, var(--bg) 48%, #f4f8f2 100%);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1180px, calc(100% - 32px));
+      margin: 28px auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      min-width: 420px;
+    }
+
+    .metric {
+      padding: 14px 16px;
+      border: 1px solid rgba(8, 120, 255, 0.18);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 10px 25px rgba(20, 48, 87, 0.07);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 4px;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 0.85fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .workspace,
+    .rubric {
+      border: 1px solid #bfd1e8;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    .workspace {
+      overflow: hidden;
+    }
+
+    .module {
+      padding: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .module:last-child {
+      border-bottom: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 18px;
+      font-size: 23px;
+      line-height: 1.2;
+    }
+
+    .icon {
+      width: 34px;
+      height: 34px;
+      color: var(--blue);
+      flex: 0 0 auto;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      color: #303846;
+      font-weight: 700;
+    }
+
+    .field-label {
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      height: 46px;
+      border: 1px solid #cbd6e2;
+      border-radius: 8px;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--ink);
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 4px rgba(8, 120, 255, 0.14);
+    }
+
+    .score-control {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 14px;
+      align-items: end;
+    }
+
+    .range-wrap {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .scale {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 16px;
+      color: #fff;
+      background: var(--blue);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .btn:hover {
+      background: var(--blue-dark);
+    }
+
+    .btn.secondary {
+      color: var(--ink);
+      background: #eaf0f7;
+    }
+
+    .btn.secondary:hover {
+      background: #dfe8f2;
+    }
+
+    .btn svg {
+      width: 19px;
+      height: 19px;
+      flex: 0 0 auto;
+    }
+
+    .average-panel {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .score-ring {
+      width: 170px;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: conic-gradient(var(--green) calc(var(--score, 0) * 10%), #e8eef5 0);
+      position: relative;
+    }
+
+    .score-ring::before {
+      content: "";
+      position: absolute;
+      inset: 13px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .average-value {
+      position: relative;
+      text-align: center;
+    }
+
+    .average-value strong {
+      display: block;
+      font-size: 46px;
+      line-height: 1;
+    }
+
+    .average-value span {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .average-copy {
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .records {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+
+    .records th,
+    .records td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+    }
+
+    .records th {
+      color: #4c5665;
+      background: #f5f8fc;
+      font-size: 14px;
+    }
+
+    .records tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .empty {
+      padding: 20px;
+      border: 1px dashed #c3cfdd;
+      border-radius: 8px;
+      color: var(--muted);
+      text-align: center;
+      background: #fafcff;
+    }
+
+    .rubric {
+      padding: 24px 26px 26px;
+    }
+
+    .rubric h2 {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 20px;
+      color: var(--blue);
+      font-size: 26px;
+      line-height: 1.2;
+    }
+
+    .rubric-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .rubric-item {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 14px;
+      align-items: center;
+      min-height: 94px;
+      padding: 18px 20px;
+      border: 1px solid #d7d7d7;
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .rubric-item h3 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.18;
+    }
+
+    .rubric-item p {
+      margin: 0;
+      color: #7b7f88;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%) translateY(20px);
+      padding: 12px 18px;
+      border-radius: 8px;
+      color: #fff;
+      background: #243044;
+      opacity: 0;
+      pointer-events: none;
+      transition: 0.2s ease;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 920px) {
+      .topbar,
+      .layout,
+      .average-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        display: block;
+      }
+
+      .summary-strip {
+        min-width: 0;
+        margin-top: 16px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .app {
+        width: min(100% - 20px, 1180px);
+        margin: 14px auto;
+      }
+
+      .summary-strip,
+      .form-grid,
+      .score-control {
+        grid-template-columns: 1fr;
+      }
+
+      .module,
+      .rubric {
+        padding: 18px;
+      }
+
+      .rubric-item {
+        grid-template-columns: 42px 1fr;
+        padding: 16px 14px;
+      }
+
+      .rubric-item h3 {
+        font-size: 19px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>课堂汇报评分</h1>
+        <p class="subtitle">同学提交 0-10 分评分后，系统自动统计平均值。</p>
+      </div>
+      <div class="summary-strip" aria-label="评分概览">
+        <div class="metric">
+          <span>当前小组</span>
+          <strong id="metricGroup">未填写</strong>
+        </div>
+        <div class="metric">
+          <span>评分人数</span>
+          <strong id="metricCount">0</strong>
+        </div>
+        <div class="metric">
+          <span>平均分</span>
+          <strong id="metricAverage">0.00</strong>
+        </div>
+      </div>
+    </header>
+
+    <div class="layout">
+      <section class="workspace" aria-label="评分操作区">
+        <div class="module">
+          <h2 class="section-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8.7l-4.1 2.7A1 1 0 0 1 3 19.9V6a2 2 0 0 1 2-2Zm3 5v2h10V9H7Zm0 4v2h7v-2H7Z"/>
+            </svg>
+            个人给汇报小组打分
+          </h2>
+          <form id="scoreForm">
+            <div class="form-grid">
+              <label>
+                <span class="field-label">汇报小组</span>
+                <select id="groupName" required>
+                  <option value="第 1 小组">第 1 小组</option>
+                  <option value="第 2 小组">第 2 小组</option>
+                  <option value="第 3 小组">第 3 小组</option>
+                  <option value="第 4 小组">第 4 小组</option>
+                  <option value="第 5 小组">第 5 小组</option>
+                  <option value="第 6 小组">第 6 小组</option>
+                  <option value="第 7 小组">第 7 小组</option>
+                  <option value="第 8 小组">第 8 小组</option>
+                </select>
+              </label>
+              <label>
+                <span class="field-label">投票方式</span>
+                <input type="text" value="匿名投票" disabled>
+              </label>
+            </div>
+
+            <div class="score-control">
+              <label class="range-wrap">
+                <span class="field-label">本次评分</span>
+                <input id="scoreRange" type="range" min="0" max="10" step="1" value="8">
+                <span class="scale"><span>0</span><span>5</span><span>10</span></span>
+              </label>
+              <label>
+                <span class="field-label">分数</span>
+                <input id="scoreNumber" type="number" min="0" max="10" step="1" value="8">
+              </label>
+            </div>
+
+            <div class="actions">
+              <button class="btn" type="submit">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.8 5.4 9 16.2l-4.8-4.8L2.8 12.8 9 19 21.2 6.8l-1.4-1.4Z"/></svg>
+                提交评分
+              </button>
+              <button class="btn secondary" type="button" id="clearBtn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 21a2 2 0 0 1-2-2V7H4V5h5V3h6v2h5v2h-1v12a2 2 0 0 1-2 2H7Zm2-4h2V9H9v8Zm4 0h2V9h-2v8Z"/></svg>
+                清空记录
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="module">
+          <h2 class="section-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M4 19h16v2H4v-2Zm1-2V9h4v8H5Zm5 0V3h4v14h-4Zm5 0V6h4v11h-4Z"/>
+            </svg>
+            所有个人打分的平均值
+          </h2>
+          <div class="average-panel">
+            <div class="score-ring" id="scoreRing">
+              <div class="average-value">
+                <strong id="averageText">0.00</strong>
+                <span>平均分 / 10</span>
+              </div>
+            </div>
+            <p class="average-copy" id="averageCopy">还没有同学提交评分。提交第一条评分后，这里会自动显示平均值、评分人数和最高/最低分。</p>
+          </div>
+        </div>
+
+        <div class="module">
+          <h2 class="section-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="currentColor" d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 4v2h10V7H7Zm0 4v2h10v-2H7Zm0 4v2h6v-2H7Z"/>
+            </svg>
+            评分记录
+          </h2>
+          <div id="recordWrap" class="empty">暂无评分记录</div>
+        </div>
+      </section>
+
+      <aside class="rubric" aria-label="评分标准">
+        <h2>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M7 3h10v3h4v2a6 6 0 0 1-6 6h-.2A5 5 0 0 1 13 16.6V19h4v2H7v-2h4v-2.4A5 5 0 0 1 9.2 14H9a6 6 0 0 1-6-6V6h4V3Zm10 5v3.5A3.5 3.5 0 0 0 20.9 8H17ZM3.1 8A3.5 3.5 0 0 0 7 11.5V8H3.1Z"/>
+          </svg>
+          评分标准（总分10分）
+        </h2>
+        <div class="rubric-list">
+          <article class="rubric-item">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 5h7a3 3 0 0 1 3 3v11a3 3 0 0 0-3-3H4V5Zm16 0h-5a4.8 4.8 0 0 0-2 .4A5 5 0 0 1 16 8v8h4V5Z"/></svg>
+            <div>
+              <h3>内容准确性（4分）</h3>
+              <p>理论与方法讲解准确深入，无明显错误</p>
+            </div>
+          </article>
+          <article class="rubric-item">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 5h18v11H8l-5 3V5Zm4 4v4h2V9H7Zm4 0v4h2V9h-2Zm4 0v4h2V9h-2Z"/></svg>
+            <div>
+              <h3>表达清晰度（3分）</h3>
+              <p>逻辑清晰，语言流畅，PPT制作精良美观</p>
+            </div>
+          </article>
+          <article class="rubric-item">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM3 20a7 7 0 0 1 13.3-3H21V4h2v15h-7.7A6.9 6.9 0 0 0 10 17a6.9 6.9 0 0 0-5.8 3H3Z"/></svg>
+            <div>
+              <h3>团队协作（2分）</h3>
+              <p>分工明确，配合默契，全员参与</p>
+            </div>
+          </article>
+          <article class="rubric-item">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v12H9l-5 4V4Zm6 3-.3 2H7v2h2.4L9 14h2l.4-3h2.2l-.4 3h2l.4-3H18V9h-2.1l.3-2h-2l-.3 2h-2.2l.3-2h-2Zm1.1 2h2.2l-.3 2h-2.2l.3-2Z"/></svg>
+            <div>
+              <h3>互动与应答（1分）</h3>
+              <p>积极准确回应老师和同学的提问</p>
+            </div>
+          </article>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const storageKey = "classPresentationScoresAnonymousV2";
+    const form = document.querySelector("#scoreForm");
+    const groupName = document.querySelector("#groupName");
+    const scoreRange = document.querySelector("#scoreRange");
+    const scoreNumber = document.querySelector("#scoreNumber");
+    const clearBtn = document.querySelector("#clearBtn");
+    const toast = document.querySelector("#toast");
+    const recordWrap = document.querySelector("#recordWrap");
+    const metricGroup = document.querySelector("#metricGroup");
+    const metricCount = document.querySelector("#metricCount");
+    const metricAverage = document.querySelector("#metricAverage");
+    const averageText = document.querySelector("#averageText");
+    const averageCopy = document.querySelector("#averageCopy");
+    const scoreRing = document.querySelector("#scoreRing");
+
+    let records = loadRecords();
+    render();
+
+    scoreRange.addEventListener("input", () => {
+      scoreNumber.value = scoreRange.value;
+    });
+
+    scoreNumber.addEventListener("input", () => {
+      const value = normalizeScore(scoreNumber.value);
+      scoreRange.value = value;
+    });
+
+    groupName.addEventListener("change", render);
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const group = groupName.value;
+      const score = normalizeScore(scoreNumber.value);
+
+      const nextRecord = {
+        group,
+        score,
+        time: new Date().toLocaleString("zh-CN", { hour12: false })
+      };
+
+      records.push(nextRecord);
+      saveRecords();
+      render();
+      showToast("匿名评分已提交。");
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (!records.length) {
+        showToast("当前没有评分记录。");
+        return;
+      }
+      if (confirm("确定要清空所有评分记录吗？")) {
+        records = [];
+        saveRecords();
+        render();
+        showToast("评分记录已清空。");
+      }
+    });
+
+    function normalizeScore(value) {
+      const number = Number.parseInt(value, 10);
+      if (Number.isNaN(number)) return 0;
+      return Math.min(10, Math.max(0, number));
+    }
+
+    function loadRecords() {
+      try {
+        return JSON.parse(localStorage.getItem(storageKey)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveRecords() {
+      localStorage.setItem(storageKey, JSON.stringify(records));
+    }
+
+    function renderSummaryOnly() {
+      metricGroup.textContent = groupName.value || getLatestGroup() || "未填写";
+    }
+
+    function getLatestGroup() {
+      return records.length ? records[records.length - 1].group : "";
+    }
+
+    function render() {
+      renderSummary();
+      renderRecords();
+    }
+
+    function renderSummary() {
+      const groupRecords = getCurrentGroupRecords();
+      const count = groupRecords.length;
+      const total = groupRecords.reduce((sum, item) => sum + item.score, 0);
+      const average = count ? total / count : 0;
+      const high = count ? Math.max(...groupRecords.map((item) => item.score)) : 0;
+      const low = count ? Math.min(...groupRecords.map((item) => item.score)) : 0;
+
+      metricGroup.textContent = groupName.value || getLatestGroup() || "未填写";
+      metricCount.textContent = String(count);
+      metricAverage.textContent = average.toFixed(2);
+      averageText.textContent = average.toFixed(2);
+      scoreRing.style.setProperty("--score", average.toFixed(2));
+      averageCopy.textContent = count
+        ? `当前小组共有 ${count} 人完成匿名评分，最高分 ${high}，最低分 ${low}。切换小组可查看对应小组的平均分。`
+        : "当前小组还没有同学提交评分。提交第一条评分后，这里会自动显示平均值、评分人数和最高/最低分。";
+    }
+
+    function renderRecords() {
+      const groupRecords = getCurrentGroupRecords();
+      if (!groupRecords.length) {
+        recordWrap.className = "empty";
+        recordWrap.textContent = "当前小组暂无评分记录";
+        return;
+      }
+
+      recordWrap.className = "";
+      recordWrap.innerHTML = `
+        <table class="records">
+          <thead>
+            <tr>
+              <th>汇报小组</th>
+              <th>匿名序号</th>
+              <th>分数</th>
+              <th>提交时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${groupRecords.map((item, index) => `
+              <tr>
+                <td>${escapeHtml(item.group)}</td>
+                <td>匿名 ${index + 1}</td>
+                <td><strong>${Number(item.score)}</strong></td>
+                <td>${escapeHtml(item.time)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function getCurrentGroupRecords() {
+      const currentGroup = groupName.value || getLatestGroup();
+      return records.filter((item) => item.group === currentGroup);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+  </script>
+</body>
+</html>

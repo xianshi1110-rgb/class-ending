@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>教师实时评分看板</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>教师实时评分看板</h1>
+        <p class="subtitle">学生提交后这里会自动更新。点击小组卡片，右下角显示该小组最终平均分。</p>
+        <div class="share-box">
+          <strong>发送给学生的评分网址</strong>
+          <div class="share-row">
+            <span class="share-link" id="studentLink"></span>
+            <button class="btn secondary" type="button" id="copyLinkBtn">复制</button>
+          </div>
+        </div>
+      </div>
+      <span class="status"><span class="dot"></span><span id="syncStatus">实时连接中</span></span>
+    </header>
+
+    <div class="teacher-grid">
+      <section class="panel">
+        <h2 class="section-title">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 19h16v2H4v-2Zm1-2V9h4v8H5Zm5 0V3h4v14h-4Zm5 0V6h4v11h-4Z"/></svg>
+          各小组实时平均分
+        </h2>
+        <div class="group-grid" id="groupGrid"></div>
+
+        <table class="records">
+          <thead>
+            <tr>
+              <th>匿名序号</th>
+              <th>分数</th>
+              <th>提交时间</th>
+            </tr>
+          </thead>
+          <tbody id="latestBody">
+            <tr><td colspan="3">暂无评分记录</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <aside class="side-stack">
+        <section class="rubric">
+          <h2>
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10v3h4v2a6 6 0 0 1-6 6h-.2A5 5 0 0 1 13 16.6V19h4v2H7v-2h4v-2.4A5 5 0 0 1 9.2 14H9a6 6 0 0 1-6-6V6h4V3Z"/></svg>
+            评分标准
+          </h2>
+          <div class="rubric-list">
+            <article class="rubric-item"><svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M4 5h7a3 3 0 0 1 3 3v11a3 3 0 0 0-3-3H4V5Z"/></svg><div><h3>内容准确性（4分）</h3><p>理论与方法讲解准确深入，无明显错误</p></div></article>
+            <article class="rubric-item"><svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 5h18v11H8l-5 3V5Zm4 4v4h2V9H7Zm4 0v4h2V9h-2Z"/></svg><div><h3>表达清晰度（3分）</h3><p>逻辑清晰，语言流畅，PPT制作精良美观</p></div></article>
+            <article class="rubric-item"><svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4ZM3 20a7 7 0 0 1 13.3-3H21V4h2v15h-7.7A6.9 6.9 0 0 0 10 17a6.9 6.9 0 0 0-5.8 3H3Z"/></svg><div><h3>团队协作（2分）</h3><p>分工明确，配合默契，全员参与</p></div></article>
+            <article class="rubric-item"><svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M4 4h16v12H9l-5 4V4Zm6 3-.3 2H7v2h2.4L9 14h2l.4-3h2.2l-.4 3h2l.4-3H18V9h-2.1l.3-2h-2Z"/></svg><div><h3>互动与应答（1分）</h3><p>积极准确回应老师和同学的提问</p></div></article>
+          </div>
+        </section>
+
+        <section class="final-card">
+          <h2 class="section-title">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 3 7l9 5 9-5-9-5Zm-7 8v5l7 4 7-4v-5l-7 4-7-4Z"/></svg>
+            <span id="selectedGroupTitle">第 1 小组最终得分</span>
+          </h2>
+          <div class="score-ring" id="scoreRing">
+            <div class="average-value">
+              <strong id="averageText">0.00</strong>
+              <span>平均分 / 10</span>
+            </div>
+          </div>
+          <p class="stats-line" id="statsLine">暂无评分</p>
+          <div class="bars" id="bars"></div>
+          <div class="actions">
+            <button class="btn danger" type="button" id="resetBtn">清空全部评分</button>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const groupGrid = document.querySelector("#groupGrid");
+    const averageText = document.querySelector("#averageText");
+    const scoreRing = document.querySelector("#scoreRing");
+    const statsLine = document.querySelector("#statsLine");
+    const bars = document.querySelector("#bars");
+    const latestBody = document.querySelector("#latestBody");
+    const selectedGroupTitle = document.querySelector("#selectedGroupTitle");
+    const syncStatus = document.querySelector("#syncStatus");
+    const resetBtn = document.querySelector("#resetBtn");
+    const studentLink = document.querySelector("#studentLink");
+    const copyLinkBtn = document.querySelector("#copyLinkBtn");
+
+    let selectedGroup = "第 1 小组";
+    let stats = null;
+
+    studentLink.textContent = `${location.origin}/`;
+    copyLinkBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(studentLink.textContent);
+      copyLinkBtn.textContent = "已复制";
+      window.setTimeout(() => {
+        copyLinkBtn.textContent = "复制";
+      }, 1200);
+    });
+
+    fetchStats();
+    const events = new EventSource("/events");
+    events.onmessage = (event) => {
+      stats = JSON.parse(event.data);
+      syncStatus.textContent = `已更新：${stats.updatedAt}`;
+      render();
+    };
+    events.onerror = () => {
+      syncStatus.textContent = "连接中断，正在重连";
+    };
+
+    resetBtn.addEventListener("click", async () => {
+      if (!confirm("确定要清空全部小组评分吗？")) return;
+      const pin = prompt("如已设置教师 PIN，请输入；未设置可直接确定。") || "";
+      const response = await fetch("/api/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin })
+      });
+      const result = await response.json();
+      if (result.error) alert(result.error);
+    });
+
+    async function fetchStats() {
+      const response = await fetch("/api/stats");
+      stats = await response.json();
+      render();
+    }
+
+    function render() {
+      if (!stats) return;
+      groupGrid.innerHTML = stats.groups.map((group) => `
+        <button class="group-card ${group.name === selectedGroup ? "active" : ""}" data-group="${group.name}">
+          <strong>${group.name}</strong>
+          <span>${group.count} 人评分</span>
+          <span>平均分 ${group.average.toFixed(2)}</span>
+        </button>
+      `).join("");
+
+      groupGrid.querySelectorAll(".group-card").forEach((button) => {
+        button.addEventListener("click", () => {
+          selectedGroup = button.dataset.group;
+          render();
+        });
+      });
+
+      const current = stats.groups.find((group) => group.name === selectedGroup) || stats.groups[0];
+      selectedGroupTitle.textContent = `${current.name}最终得分`;
+      averageText.textContent = current.average.toFixed(2);
+      scoreRing.style.setProperty("--score", current.average);
+      statsLine.textContent = current.count
+        ? `${current.count} 人评分，最高分 ${current.high}，最低分 ${current.low}`
+        : "暂无评分";
+
+      const maxCount = Math.max(1, ...current.distribution.map((item) => item.count));
+      bars.innerHTML = current.distribution.map((item) => `
+        <div class="bar-row">
+          <span>${item.score}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: ${(item.count / maxCount) * 100}%"></div></div>
+          <span>${item.count}</span>
+        </div>
+      `).join("");
+
+      latestBody.innerHTML = current.latest.length
+        ? current.latest.map((item) => `
+          <tr>
+            <td>${item.label}</td>
+            <td><strong>${item.score}</strong></td>
+            <td>${item.time}</td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="3">暂无评分记录</td></tr>`;
+    }
+  </script>
+</body>
+</html>

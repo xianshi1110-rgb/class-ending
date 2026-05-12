@@ -1,0 +1,13 @@
+{
+  "name": "class-score-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "课堂汇报匿名评分与教师实时看板",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
