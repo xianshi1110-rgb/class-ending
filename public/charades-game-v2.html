@@ -645,7 +645,7 @@
 
         <div class="word-area">
           <div class="word-card">
-            <div class="word-label" id="wordLabel">点击右侧“开始第一组”</div>
+            <div class="word-label" id="wordLabel">点击右侧"开始第一组"</div>
             <h2 class="word" id="currentWord">准备好了吗？</h2>
             <p class="word-note" id="wordNote">每组 1 分钟。猜对得 1 分，猜不到可直接 PASS。</p>
           </div>
@@ -697,7 +697,7 @@
   <div class="overlay hidden" id="rulesOverlay">
     <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
       <h2 id="rulesTitle">游戏规则</h2>
-      <p>每组派出一位同学作为“比划者”，其余组员负责猜词。每组限时 1 分钟，猜对一个得 1 分，猜不出来可以 PASS。</p>
+      <p>每组派出一位同学作为"比划者"，其余组员负责猜词。每组限时 1 分钟，猜对一个得 1 分，猜不出来可以 PASS。</p>
       <div class="rule-columns">
         <div class="rule-box allow">
           <strong>可以使用</strong>
@@ -717,7 +717,7 @@
   <div class="overlay hidden" id="importOverlay">
     <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="importTitle">
       <h2 id="importTitle">导入 Word 词库</h2>
-      <p>支持 `.docx` 和 `.txt` 文件。文档中请使用“第一组、第二组、第三组、第四组”作为分组标题，每个词单独一行。序号和“基础、稍难、趣味”等分类文字会自动忽略。</p>
+      <p>支持 `.docx` 和 `.txt` 文件。文档中请使用"第一组、第二组、第三组、第四组"作为分组标题，每个词单独一行。序号和"基础、稍难、趣味"等分类文字会自动忽略。</p>
       <div class="import-status">
         示例：<br>
         第一组<br>
@@ -764,70 +764,70 @@
 
   <script src="/mammoth.browser.min.js"></script>
   <script>
-    const groupTabs = document.querySelector(“#groupTabs”);
-    const stageGroup = document.querySelector(“#stageGroup”);
-    const wordProgress = document.querySelector(“#wordProgress”);
-    const wordLabel = document.querySelector(“#wordLabel”);
-    const currentWord = document.querySelector(“#currentWord”);
-    const wordNote = document.querySelector(“#wordNote”);
-    const correctBtn = document.querySelector(“#correctBtn”);
-    const passBtn = document.querySelector(“#passBtn”);
-    const timerRing = document.querySelector(“#timerRing”);
-    const timeText = document.querySelector(“#timeText”);
-    const scoreText = document.querySelector(“#scoreText”);
-    const passText = document.querySelector(“#passText”);
-    const statusText = document.querySelector(“#statusText”);
-    const startBtn = document.querySelector(“#startBtn”);
-    const resultGrid = document.querySelector(“#resultGrid”);
-    const winnerText = document.querySelector(“#winnerText”);
-    const revealWinnerBtn = document.querySelector(“#revealWinnerBtn”);
-    const winnerNames = document.querySelector(“#winnerNames”);
-    const winnerScore = document.querySelector(“#winnerScore”);
-    const rulesBtn = document.querySelector(“#rulesBtn”);
-    const importBtn = document.querySelector(“#importBtn”);
-    const resetBtn = document.querySelector(“#resetBtn”);
-    const fileInput = document.querySelector(“#fileInput”);
-    const chooseFileBtn = document.querySelector(“#chooseFileBtn”);
-    const finishSummary = document.querySelector(“#finishSummary”);
-    const toast = document.querySelector(“#toast”);
+    const groupTabs = document.querySelector("#groupTabs");
+    const stageGroup = document.querySelector("#stageGroup");
+    const wordProgress = document.querySelector("#wordProgress");
+    const wordLabel = document.querySelector("#wordLabel");
+    const currentWord = document.querySelector("#currentWord");
+    const wordNote = document.querySelector("#wordNote");
+    const correctBtn = document.querySelector("#correctBtn");
+    const passBtn = document.querySelector("#passBtn");
+    const timerRing = document.querySelector("#timerRing");
+    const timeText = document.querySelector("#timeText");
+    const scoreText = document.querySelector("#scoreText");
+    const passText = document.querySelector("#passText");
+    const statusText = document.querySelector("#statusText");
+    const startBtn = document.querySelector("#startBtn");
+    const resultGrid = document.querySelector("#resultGrid");
+    const winnerText = document.querySelector("#winnerText");
+    const revealWinnerBtn = document.querySelector("#revealWinnerBtn");
+    const winnerNames = document.querySelector("#winnerNames");
+    const winnerScore = document.querySelector("#winnerScore");
+    const rulesBtn = document.querySelector("#rulesBtn");
+    const importBtn = document.querySelector("#importBtn");
+    const resetBtn = document.querySelector("#resetBtn");
+    const fileInput = document.querySelector("#fileInput");
+    const chooseFileBtn = document.querySelector("#chooseFileBtn");
+    const finishSummary = document.querySelector("#finishSummary");
+    const toast = document.querySelector("#toast");
 
     let state = null;
     let prevTimeLeft = 60;
-    let prevGameState = “idle”;
+    let prevGameState = "idle";
 
     async function api(path, body) {
       const res = await fetch(path, {
-        method: body != null ? “POST” : “GET”,
-        headers: body != null ? { “Content-Type”: “application/json” } : {},
+        method: body != null ? "POST" : "GET",
+        headers: body != null ? { "Content-Type": "application/json" } : {},
         body: body != null ? JSON.stringify(body) : undefined
       });
       return res.json();
     }
 
     async function fetchState() {
-      state = await api(“/api/charades-v2/state”);
+      state = await api("/api/charades-v2/state");
       prevTimeLeft = state.timeLeft;
       prevGameState = state.gameState;
       renderAll();
     }
 
     function connectSSE() {
-      const events = new EventSource(“/api/charades-v2/events”);
+      const events = new EventSource("/api/charades-v2/events");
       events.onmessage = (event) => {
         const newState = JSON.parse(event.data);
-        if (newState.gameState === “running” && prevGameState !== “running”) {
+        if (newState.gameState === "running" && prevGameState !== "running") {
           tickSound(720, 0.08);
         }
-        if (newState.gameState === “finished” && prevGameState !== “finished”) {
+        if (newState.gameState === "finished" && prevGameState !== "finished") {
           tickSound(330, 0.2);
           window.setTimeout(() => tickSound(440, 0.2), 220);
-          if (!state || state.gameState !== “finished”) {
+          if (!state || state.gameState !== "finished") {
             finishSummary.textContent =
               `${newState.groups[newState.selectedIndex].name}挑战结束：猜对 ${newState.results[newState.selectedIndex].score} 个，PASS ${newState.results[newState.selectedIndex].passes} 个，用时 ${newState.results[newState.selectedIndex].duration} 秒。`;
-            openOverlay(“finishOverlay”);
+            openOverlay("finishOverlay");
           }
         }
-        if (newState.gameState === “running” && prevTimeLeft > newState.timeLeft) {
+        if (newState.gameState === "running" && prevTimeLeft > newState.timeLeft) {
           if (newState.timeLeft <= 10 && newState.timeLeft > 0) tickSound(520, 0.04);
         }
         prevTimeLeft = newState.timeLeft;
@@ -836,82 +836,82 @@
         renderAll();
       };
       events.onerror = () => {
-        showToast(“与服务器连接中断，正在重连...”);
+        showToast("与服务器连接中断，正在重连...");
       };
     }
 
     fetchState();
     connectSSE();
 
-    groupTabs.addEventListener(“click”, async (event) => {
-      const button = event.target.closest(“[data-group-index]”);
-      if (!button || (state && state.gameState === “running”)) return;
+    groupTabs.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-group-index]");
+      if (!button || (state && state.gameState === "running")) return;
       const index = Number(button.dataset.groupIndex);
-      await api(“/api/charades-v2/select-group”, { groupIndex: index });
+      await api("/api/charades-v2/select-group", { groupIndex: index });
     });
 
-    startBtn.addEventListener(“click”, async () => {
+    startBtn.addEventListener("click", async () => {
       if (!state) return;
-      if (state.gameState === “running”) {
-        await api(“/api/charades-v2/pause”);
-      } else if (state.gameState === “paused”) {
-        await api(“/api/charades-v2/resume”);
+      if (state.gameState === "running") {
+        await api("/api/charades-v2/pause");
+      } else if (state.gameState === "paused") {
+        await api("/api/charades-v2/resume");
       } else {
-        await api(“/api/charades-v2/start”);
+        await api("/api/charades-v2/start");
       }
     });
 
-    correctBtn.addEventListener(“click”, async () => {
-      if (!state || state.gameState !== “running”) return;
+    correctBtn.addEventListener("click", async () => {
+      if (!state || state.gameState !== "running") return;
       tickSound(880, 0.07);
-      await api(“/api/charades-v2/answer”, { correct: true });
+      await api("/api/charades-v2/answer", { correct: true });
     });
 
-    passBtn.addEventListener(“click”, async () => {
-      if (!state || state.gameState !== “running”) return;
+    passBtn.addEventListener("click", async () => {
+      if (!state || state.gameState !== "running") return;
       tickSound(260, 0.05);
-      await api(“/api/charades-v2/answer”, { correct: false });
+      await api("/api/charades-v2/answer", { correct: false });
     });
 
-    rulesBtn.addEventListener(“click”, () => openOverlay(“rulesOverlay”));
-    importBtn.addEventListener(“click”, () => openOverlay(“importOverlay”));
-    chooseFileBtn.addEventListener(“click”, () => fileInput.click());
-    revealWinnerBtn.addEventListener(“click”, revealWinner);
+    rulesBtn.addEventListener("click", () => openOverlay("rulesOverlay"));
+    importBtn.addEventListener("click", () => openOverlay("importOverlay"));
+    chooseFileBtn.addEventListener("click", () => fileInput.click());
+    revealWinnerBtn.addEventListener("click", revealWinner);
 
-    resetBtn.addEventListener(“click”, async () => {
-      if (!confirm(“确定要重置全部比赛成绩吗？”)) return;
-      await api(“/api/charades-v2/reset”);
-      showToast(“比赛已重置。”);
+    resetBtn.addEventListener("click", async () => {
+      if (!confirm("确定要重置全部比赛成绩吗？")) return;
+      await api("/api/charades-v2/reset");
+      showToast("比赛已重置。");
     });
 
-    document.addEventListener(“click”, (event) => {
-      const closeTarget = event.target.closest(“[data-close]”);
+    document.addEventListener("click", (event) => {
+      const closeTarget = event.target.closest("[data-close]");
       if (closeTarget) closeOverlay(closeTarget.dataset.close);
     });
 
-    document.addEventListener(“keydown”, async (event) => {
-      if (!state || state.gameState !== “running”) return;
-      if (event.code === “ArrowRight” || event.code === “Space”) {
+    document.addEventListener("keydown", async (event) => {
+      if (!state || state.gameState !== "running") return;
+      if (event.code === "ArrowRight" || event.code === "Space") {
         event.preventDefault();
         tickSound(880, 0.07);
-        await api(“/api/charades-v2/answer”, { correct: true });
+        await api("/api/charades-v2/answer", { correct: true });
       }
-      if (event.code === “ArrowLeft”) {
+      if (event.code === "ArrowLeft") {
         event.preventDefault();
         tickSound(260, 0.05);
-        await api(“/api/charades-v2/answer”, { correct: false });
+        await api("/api/charades-v2/answer", { correct: false });
       }
     });
 
-    fileInput.addEventListener(“change”, async () => {
+    fileInput.addEventListener("change", async () => {
       const file = fileInput.files[0];
       if (!file) return;
 
       try {
-        let text = “”;
-        if (file.name.toLowerCase().endsWith(“.docx”)) {
+        let text = "";
+        if (file.name.toLowerCase().endsWith(".docx")) {
           if (!window.mammoth) {
-            throw new Error(“Word 解析组件未加载，请联网后重试。”);
+            throw new Error("Word 解析组件未加载，请联网后重试。");
           }
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.extractRawText({ arrayBuffer });
@@ -921,13 +921,13 @@
         }
 
         const imported = parseWordGroups(text);
-        await api(“/api/charades-v2/import”, { groups: imported });
-        closeOverlay(“importOverlay”);
-        showToast(“词库导入成功。”);
+        await api("/api/charades-v2/import", { groups: imported });
+        closeOverlay("importOverlay");
+        showToast("词库导入成功。");
       } catch (error) {
-        showToast(error.message || “词库导入失败。”);
+        showToast(error.message || "词库导入失败。");
       } finally {
-        fileInput.value = “”;
+        fileInput.value = "";
       }
     });
 
@@ -943,18 +943,18 @@
       groupTabs.innerHTML = state.groups.map((group, index) => {
         const result = state.results[index];
         const classes = [
-          “group-tab”,
-          index === state.selectedIndex ? “active” : “”,
-          result.completed ? “completed” : “”
-        ].filter(Boolean).join(“ “);
+          "group-tab",
+          index === state.selectedIndex ? "active" : "",
+          result.completed ? "completed" : ""
+        ].filter(Boolean).join(" ");
 
         return `
-          <button class=”${classes}” type=”button” data-group-index=”${index}” ${state.gameState === “running” ? “disabled” : “”}>
+          <button class="${classes}" type="button" data-group-index="${index}" ${state.gameState === "running" ? "disabled" : ""}>
             <strong>${escapeHtml(group.name)}</strong>
             <span>${result.completed ? `已完成 · ${result.score} 分` : `${group.words.length} 个词 · 待挑战`}</span>
           </button>
         `;
-      }).join(“”);
+      }).join("");
     }
 
     function renderStage() {
@@ -963,45 +963,45 @@
       stageGroup.textContent = group.name;
       scoreText.textContent = result.score;
       passText.textContent = result.passes;
-      correctBtn.disabled = state.gameState !== “running”;
-      passBtn.disabled = state.gameState !== “running”;
+      correctBtn.disabled = state.gameState !== "running";
+      passBtn.disabled = state.gameState !== "running";
 
-      if (state.gameState === “running” || state.gameState === “paused”) {
-        currentWord.textContent = group.words[state.currentIndex] || “词库完成”;
-        wordLabel.textContent = state.gameState === “paused” ? “游戏已暂停” : “请只用非语言方式表达”;
-        wordNote.textContent = “猜对点击右下方绿色按钮；猜不到点击 PASS。”;
+      if (state.gameState === "running" || state.gameState === "paused") {
+        currentWord.textContent = group.words[state.currentIndex] || "词库完成";
+        wordLabel.textContent = state.gameState === "paused" ? "游戏已暂停" : "请只用非语言方式表达";
+        wordNote.textContent = "猜对点击右下方绿色按钮；猜不到点击 PASS。";
         wordProgress.textContent = `第 ${Math.min(state.currentIndex + 1, group.words.length)} / ${group.words.length} 题`;
       } else if (result.completed) {
         currentWord.textContent = `${result.score} 分`;
         wordLabel.textContent = `${group.name}挑战完成`;
-        wordNote.textContent = `猜对 ${result.score} 个，PASS ${result.passes} 个，用时 ${result.duration} 秒。可点击”重新挑战”覆盖本组成绩。`;
+        wordNote.textContent = `猜对 ${result.score} 个，PASS ${result.passes} 个，用时 ${result.duration} 秒。可点击"重新挑战"覆盖本组成绩。`;
         wordProgress.textContent = `完成 ${result.score + result.passes} / ${group.words.length} 题`;
       } else {
-        currentWord.textContent = “准备好了吗？”;
-        wordLabel.textContent = `点击右侧”开始${group.name}”`;
-        wordNote.textContent = “每组 1 分钟。猜对得 1 分，猜不到可直接 PASS。”;
+        currentWord.textContent = "准备好了吗？";
+        wordLabel.textContent = `点击右侧"开始${group.name}"`;
+        wordNote.textContent = "每组 1 分钟。猜对得 1 分，猜不到可直接 PASS。";
         wordProgress.textContent = `词库共 ${group.words.length} 题`;
       }
 
-      if (state.gameState === “running”) {
-        startBtn.textContent = “暂停”;
+      if (state.gameState === "running") {
+        startBtn.textContent = "暂停";
         statusText.textContent = `${group.name}正在挑战，请主持人操作猜对或 PASS。`;
-      } else if (state.gameState === “paused”) {
-        startBtn.textContent = “继续”;
-        statusText.textContent = “倒计时已暂停。”;
+      } else if (state.gameState === "paused") {
+        startBtn.textContent = "继续";
+        statusText.textContent = "倒计时已暂停。";
       } else if (result.completed) {
-        startBtn.textContent = “重新挑战”;
+        startBtn.textContent = "重新挑战";
         statusText.textContent = `${group.name}本轮得分 ${result.score} 分。`;
       } else {
         startBtn.textContent = `开始${group.name}`;
-        statusText.textContent = “点击开始后立即显示第一个词并开始倒计时。”;
+        statusText.textContent = "点击开始后立即显示第一个词并开始倒计时。";
       }
     }
 
     function renderTimer() {
       timeText.textContent = state.timeLeft;
-      timerRing.style.setProperty(“--timer-progress”, `${(state.timeLeft / 60) * 100}%`);
-      timerRing.classList.toggle(“warning”, state.timeLeft <= 10 && state.gameState === “running”);
+      timerRing.style.setProperty("--timer-progress", `${(state.timeLeft / 60) * 100}%`);
+      timerRing.classList.toggle("warning", state.timeLeft <= 10 && state.gameState === "running");
     }
 
     function renderResults() {
@@ -1010,22 +1010,22 @@
       resultGrid.innerHTML = state.groups.map((group, index) => {
         const result = state.results[index];
         return `
-          <article class=”result-card”>
+          <article class="result-card">
             <strong>${escapeHtml(group.name)}</strong>
-            <div class=”big-score”>${result.completed ? result.score : “-”}</div>
-            <span>${result.completed ? `猜对 ${result.score} · PASS ${result.passes} · 用时 ${result.duration} 秒` : “尚未挑战”}</span>
+            <div class="big-score">${result.completed ? result.score : "-"}</div>
+            <span>${result.completed ? `猜对 ${result.score} · PASS ${result.passes} · 用时 ${result.duration} 秒` : "尚未挑战"}</span>
           </article>
         `;
-      }).join(“”);
+      }).join("");
 
       if (completedResults.length === state.groups.length) {
-        winnerText.textContent = “四组挑战完成，可以揭晓最终结果”;
+        winnerText.textContent = "四组挑战完成，可以揭晓最终结果";
         revealWinnerBtn.disabled = false;
-        revealWinnerBtn.textContent = “揭晓最终获胜小组”;
+        revealWinnerBtn.textContent = "揭晓最终获胜小组";
       } else {
         winnerText.textContent = `已完成 ${completedResults.length} / ${state.groups.length} 组`;
         revealWinnerBtn.disabled = true;
-        revealWinnerBtn.textContent = “完成四组挑战后揭晓获胜小组”;
+        revealWinnerBtn.textContent = "完成四组挑战后揭晓获胜小组";
       }
     }
 
@@ -1036,28 +1036,28 @@
         .filter((group, index) => state.results[index].score === bestScore)
         .map((group) => group.name);
 
-      winnerNames.textContent = winners.join(“、”);
+      winnerNames.textContent = winners.join("、");
       winnerScore.textContent = winners.length > 1
         ? `并列最佳表达团队 · ${bestScore} 分`
         : `最佳表达团队 · ${bestScore} 分`;
-      openOverlay(“winnerOverlay”);
+      openOverlay("winnerOverlay");
       tickSound(660, 0.18);
       window.setTimeout(() => tickSound(880, 0.25), 190);
     }
 
     function parseWordGroups(text) {
       const normalized = text
-        .replace(/\r/g, “”)
-        .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/g, “”)
-        .replace(/[（(]?[0-9一二三四五六七八九十]+[）).、．]\s*/g, “”);
+        .replace(/\r/g, "")
+        .replace(/[①②③④⑤⑥⑦⑧⑨⑩]/g, "")
+        .replace(/[（(]?[0-9一二三四五六七八九十]+[）).、．]\s*/g, "");
       const lines = normalized
-        .split(“\n”)
+        .split("\n")
         .map((line) => line.trim())
         .filter(Boolean);
 
-      const headings = [“第一组”, “第二组”, “第三组”, “第四组”];
+      const headings = ["第一组", "第二组", "第三组", "第四组"];
       const ignored = new Set([
-        “基础”, “稍难”, “趣味”, “词库”, “词库：”, “________________________________________”
+        "基础", "稍难", "趣味", "词库", "词库：", "________________________________________"
       ]);
       const imported = headings.map((name) => ({ name, words: [] }));
       let currentGroup = -1;
@@ -1070,31 +1070,31 @@
         }
 
         if (currentGroup < 0 || ignored.has(line) || /^[_\-—=]{4,}$/.test(line)) continue;
-        const word = line.replace(/^[•·●○]\s*/, “”).trim();
+        const word = line.replace(/^[•·●○]\s*/, "").trim();
         if (word && word.length <= 20 && !imported[currentGroup].words.includes(word)) {
           imported[currentGroup].words.push(word);
         }
       }
 
       if (imported.some((group) => group.words.length === 0)) {
-        throw new Error(“未能识别完整的四组词库，请检查分组标题和换行格式。”);
+        throw new Error("未能识别完整的四组词库，请检查分组标题和换行格式。");
       }
       return imported;
     }
 
     function openOverlay(id) {
-      document.querySelector(`#${id}`).classList.remove(“hidden”);
+      document.querySelector(`#${id}`).classList.remove("hidden");
     }
 
     function closeOverlay(id) {
-      document.querySelector(`#${id}`).classList.add(“hidden”);
+      document.querySelector(`#${id}`).classList.add("hidden");
     }
 
     function showToast(message) {
       toast.textContent = message;
-      toast.classList.add(“show”);
+      toast.classList.add("show");
       window.clearTimeout(showToast.timer);
-      showToast.timer = window.setTimeout(() => toast.classList.remove(“show”), 2200);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
     }
 
     function tickSound(frequency, duration) {
@@ -1117,11 +1117,11 @@
 
     function escapeHtml(value) {
       return String(value)
-        .replaceAll(“&”, “&amp;”)
-        .replaceAll(“<”, “&lt;”)
-        .replaceAll(“>”, “&gt;”)
-        .replaceAll('”', “&quot;”)
-        .replaceAll(“'”, “&#039;”);
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
   </script>
 </body>
