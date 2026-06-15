@@ -10,7 +10,18 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const GROUPS = Array.from({ length: 8 }, (_, index) => `第 ${index + 1} 小组`);
 const clients = new Set();
 
+const CHARADES_V2_STATE_FILE = path.join(__dirname, "charades-v2-state.json");
+const CHARADES_V2_DEFAULT_WORDS = [
+  { name: "第一组", words: ["老师", "举手", "提问", "PPT", "鼓励", "螺钿", "书法", "刺绣", "粤曲", "香囊", "拖堂", "因材施教", "课堂互动", "点石成金"] },
+  { name: "第二组", words: ["学生", "黑板", "板书", "倾听", "讨论", "拓印", "扎染", "串珠", "拼豆", "篆刻", "忘词", "教学设计", "合作学习", "余音绕梁"] },
+  { name: "第三组", words: ["考试", "点名", "点赞", "示范", "总结", "陶艺", "中国结", "掐丝珐琅", "点茶", "合香", "冷场", "课堂管理", "反馈", "循循善诱"] },
+  { name: "第四组", words: ["回答", "作业", "批评", "爱心", "听不懂", "剪纸", "油画", "健身", "粘土", "金箔画", "熬夜", "AI教学", "教师成长", "不离不弃"] }
+];
+const charadesV2Clients = new Set();
+let charadesV2TimerId = null;
+
 let votes = loadVotes();
+let charadesV2State = loadCharadesV2State();
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -84,6 +95,140 @@ const server = http.createServer(async (req, res) => {
     votes = [];
     saveVotes();
     broadcast();
+    return sendJson(res, { ok: true });
+  }
+
+  // --- charades v2 game routes ---
+
+  if (req.method === "GET" && url.pathname === "/charades-v2") {
+    return serveFile(res, path.join(PUBLIC_DIR, "charades-game-v2.html"));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/charades-v2/state") {
+    return sendJson(res, charadesV2State);
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/charades-v2/events") {
+    return openCharadesV2EventStream(req, res);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/select-group") {
+    const body = await readJson(req);
+    const index = Number(body.groupIndex);
+    if (!Number.isInteger(index) || index < 0 || index >= charadesV2State.groups.length) {
+      return sendJson(res, { error: "无效的小组索引。" }, 400);
+    }
+    charadesV2State.selectedIndex = index;
+    charadesV2State.currentIndex = 0;
+    charadesV2State.timeLeft = 60;
+    charadesV2State.gameState = charadesV2State.results[index].completed ? "finished" : "idle";
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/start") {
+    const group = charadesV2State.groups[charadesV2State.selectedIndex];
+    if (!group || !group.words.length) {
+      return sendJson(res, { error: "当前小组没有词语。" }, 400);
+    }
+    charadesV2State.currentIndex = 0;
+    charadesV2State.timeLeft = 60;
+    charadesV2State.results[charadesV2State.selectedIndex] = { score: 0, passes: 0, completed: false, duration: null };
+    charadesV2State.gameState = "running";
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    startCharadesV2Timer();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/answer") {
+    if (charadesV2State.gameState !== "running") {
+      return sendJson(res, { error: "游戏未在进行中。" }, 400);
+    }
+    const body = await readJson(req);
+    const correct = Boolean(body.correct);
+    const result = charadesV2State.results[charadesV2State.selectedIndex];
+    if (correct) {
+      result.score += 1;
+    } else {
+      result.passes += 1;
+    }
+    charadesV2State.currentIndex += 1;
+    if (charadesV2State.currentIndex >= charadesV2State.groups[charadesV2State.selectedIndex].words.length) {
+      charadesV2State.gameState = "finished";
+      result.completed = true;
+      result.duration = 60 - charadesV2State.timeLeft;
+    }
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    return sendJson(res, { ok: true, finished: charadesV2State.gameState === "finished", result });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/pause") {
+    if (charadesV2State.gameState !== "running") {
+      return sendJson(res, { error: "游戏未在进行中。" }, 400);
+    }
+    charadesV2State.gameState = "paused";
+    charadesV2State.updatedAt = new Date().toISOString();
+    stopCharadesV2Timer();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/resume") {
+    if (charadesV2State.gameState !== "paused") {
+      return sendJson(res, { error: "游戏未在暂停中。" }, 400);
+    }
+    charadesV2State.gameState = "running";
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    startCharadesV2Timer();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/finish") {
+    if (charadesV2State.gameState !== "running" && charadesV2State.gameState !== "paused") {
+      return sendJson(res, { error: "游戏未在进行中。" }, 400);
+    }
+    const result = charadesV2State.results[charadesV2State.selectedIndex];
+    charadesV2State.gameState = "finished";
+    result.completed = true;
+    result.duration = 60 - charadesV2State.timeLeft;
+    stopCharadesV2Timer();
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/reset") {
+    stopCharadesV2Timer();
+    charadesV2State = createCharadesV2State();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/charades-v2/import") {
+    const body = await readJson(req);
+    if (!body.groups || !Array.isArray(body.groups) || body.groups.length === 0) {
+      return sendJson(res, { error: "词库数据无效。" }, 400);
+    }
+    charadesV2State.groups = body.groups;
+    charadesV2State.selectedIndex = 0;
+    charadesV2State.currentIndex = 0;
+    charadesV2State.timeLeft = 60;
+    charadesV2State.gameState = "idle";
+    charadesV2State.results = body.groups.map(() => ({ score: 0, passes: 0, completed: false, duration: null }));
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
     return sendJson(res, { ok: true });
   }
 
@@ -227,4 +372,77 @@ function broadcast() {
 
 function hashVoter(voterId) {
   return crypto.createHash("sha256").update(voterId).digest("hex");
+}
+
+function createCharadesV2State() {
+  return {
+    groups: structuredClone(CHARADES_V2_DEFAULT_WORDS),
+    selectedIndex: 0,
+    currentIndex: 0,
+    timeLeft: 60,
+    gameState: "idle",
+    results: CHARADES_V2_DEFAULT_WORDS.map(() => ({ score: 0, passes: 0, completed: false, duration: null })),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadCharadesV2State() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(CHARADES_V2_STATE_FILE, "utf8"));
+    if (!raw.groups || !Array.isArray(raw.groups)) throw new Error("invalid");
+    return raw;
+  } catch {
+    return createCharadesV2State();
+  }
+}
+
+function saveCharadesV2State() {
+  fs.writeFileSync(CHARADES_V2_STATE_FILE, JSON.stringify(charadesV2State, null, 2), "utf8");
+}
+
+function openCharadesV2EventStream(req, res) {
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive"
+  });
+  res.write(`data: ${JSON.stringify(charadesV2State)}\n\n`);
+  charadesV2Clients.add(res);
+  req.on("close", () => charadesV2Clients.delete(res));
+}
+
+function broadcastCharadesV2() {
+  const message = `data: ${JSON.stringify(charadesV2State)}\n\n`;
+  for (const client of charadesV2Clients) {
+    client.write(message);
+  }
+}
+
+function startCharadesV2Timer() {
+  stopCharadesV2Timer();
+  charadesV2TimerId = setInterval(() => {
+    if (charadesV2State.gameState !== "running") {
+      stopCharadesV2Timer();
+      return;
+    }
+    charadesV2State.timeLeft -= 1;
+    if (charadesV2State.timeLeft <= 0) {
+      charadesV2State.timeLeft = 0;
+      const result = charadesV2State.results[charadesV2State.selectedIndex];
+      charadesV2State.gameState = "finished";
+      result.completed = true;
+      result.duration = 60;
+      stopCharadesV2Timer();
+    }
+    charadesV2State.updatedAt = new Date().toISOString();
+    saveCharadesV2State();
+    broadcastCharadesV2();
+  }, 1000);
+}
+
+function stopCharadesV2Timer() {
+  if (charadesV2TimerId) {
+    clearInterval(charadesV2TimerId);
+    charadesV2TimerId = null;
+  }
 }
