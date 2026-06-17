@@ -20,8 +20,22 @@ const CHARADES_V2_DEFAULT_WORDS = [
 const charadesV2Clients = new Set();
 let charadesV2TimerId = null;
 
+const PEER_EVAL_FILE = path.join(__dirname, "peer-eval-results.json");
+const PEER_ROSTER = [
+  { group: 1, members: ["黄雯琪", "黄悦菡", "陈浩铭", "吴小悦", "梁紫斐"] },
+  { group: 2, members: ["肖清蕾", "王漫玉", "张颖珍", "周天然", "梁嘉怡"] },
+  { group: 3, members: ["董博原", "苏智锐", "覃浩哲", "杨少杰", "徐国梁"] },
+  { group: 4, members: ["钟幸霖", "方美苏", "李佳兴"] },
+  { group: 5, members: ["海尔文森", "黄子杰", "劳敬翔", "谭志选", "李逸然", "黎浩源"] },
+  { group: 6, members: ["白艺馨", "娜迪热·热合曼江", "麦迪乃木·吾布力卡斯木", "李姗珊", "卓绮君"] },
+  { group: 7, members: ["陈梓生", "张智森", "林奕鑫", "提列克·达木江"] },
+  { group: 8, members: ["周健斌", "邝展豪", "黃宇軒", "唐棹晞", "帕科扎提·甫尔卡提"] },
+  { group: 9, members: ["张超越"] }
+];
+
 let votes = loadVotes();
 let charadesV2State = loadCharadesV2State();
+let peerEvalSubmissions = loadPeerEvalSubmissions();
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -229,6 +243,92 @@ const server = http.createServer(async (req, res) => {
     charadesV2State.updatedAt = new Date().toISOString();
     saveCharadesV2State();
     broadcastCharadesV2();
+    return sendJson(res, { ok: true });
+  }
+
+  // --- peer evaluation routes ---
+
+  if (req.method === "GET" && url.pathname === "/peer-eval") {
+    return serveFile(res, path.join(PUBLIC_DIR, "peer-eval.html"));
+  }
+
+  if (req.method === "GET" && url.pathname === "/peer-eval-teacher") {
+    return serveFile(res, path.join(PUBLIC_DIR, "peer-eval-teacher.html"));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/peer-eval/roster") {
+    return sendJson(res, { roster: PEER_ROSTER });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/peer-eval/submit") {
+    try {
+      const body = await readJson(req);
+      const group = Number(body.group);
+      const groupInfo = PEER_ROSTER.find((item) => item.group === group);
+      const isLeader = Boolean(body.isLeader);
+      const voterId = String(body.voterId || "");
+      const ratings = Array.isArray(body.ratings) ? body.ratings : [];
+
+      if (!groupInfo) {
+        return sendJson(res, { error: "请选择有效组号。" }, 400);
+      }
+      if (voterId.length < 12) {
+        return sendJson(res, { error: "匿名评分标识无效，请刷新页面后重试。" }, 400);
+      }
+      if (ratings.length !== groupInfo.members.length) {
+        return sendJson(res, { error: "请为本组所有成员评分。" }, 400);
+      }
+
+      const normalizedRatings = groupInfo.members.map((name) => {
+        const rating = ratings.find((item) => item.name === name);
+        const score = Number.parseInt(rating && rating.score, 10);
+        if (!Number.isInteger(score) || score < 0 || score > 10) {
+          throw new Error("invalid score");
+        }
+        return { name, score };
+      });
+
+      const voterHash = hashVoter(voterId).slice(0, 16);
+      const existing = peerEvalSubmissions.find((item) => item.group === group && item.voterHash === voterHash);
+      const nextSubmission = {
+        id: existing ? existing.id : crypto.randomUUID(),
+        group,
+        isLeader,
+        voterHash,
+        ratings: normalizedRatings,
+        submittedAt: new Date().toISOString()
+      };
+
+      if (existing) {
+        Object.assign(existing, nextSubmission);
+      } else {
+        peerEvalSubmissions.push(nextSubmission);
+      }
+
+      savePeerEvalSubmissions();
+      return sendJson(res, { ok: true, updated: Boolean(existing) });
+    } catch {
+      return sendJson(res, { error: "提交失败，请检查分数是否为 0-10 的整数。" }, 400);
+    }
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/peer-eval/stats") {
+    return sendJson(res, buildPeerEvalStats());
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/peer-eval/csv") {
+    return sendCsv(res, buildPeerEvalCsv(), "peer-eval-details.csv");
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/peer-eval/reset") {
+    if (TEACHER_PIN) {
+      const body = await readJson(req);
+      if (String(body.pin || "") !== TEACHER_PIN) {
+        return sendJson(res, { error: "教师 PIN 不正确。" }, 403);
+      }
+    }
+    peerEvalSubmissions = [];
+    savePeerEvalSubmissions();
     return sendJson(res, { ok: true });
   }
 
@@ -445,4 +545,101 @@ function stopCharadesV2Timer() {
     clearInterval(charadesV2TimerId);
     charadesV2TimerId = null;
   }
+}
+
+function loadPeerEvalSubmissions() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PEER_EVAL_FILE, "utf8"));
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePeerEvalSubmissions() {
+  fs.writeFileSync(PEER_EVAL_FILE, JSON.stringify(peerEvalSubmissions, null, 2), "utf8");
+}
+
+function buildPeerEvalStats() {
+  const groups = PEER_ROSTER.map((groupInfo) => {
+    const submissions = peerEvalSubmissions.filter((item) => item.group === groupInfo.group);
+    const memberStats = groupInfo.members.map((name) => {
+      const scores = submissions
+        .map((submission) => submission.ratings.find((rating) => rating.name === name))
+        .filter(Boolean)
+        .map((rating) => rating.score);
+      const total = scores.reduce((sum, score) => sum + score, 0);
+      return {
+        name,
+        count: scores.length,
+        average: scores.length ? Number((total / scores.length).toFixed(2)) : 0,
+        scores
+      };
+    });
+
+    return {
+      group: groupInfo.group,
+      members: groupInfo.members,
+      submissionCount: submissions.length,
+      leaderCount: submissions.filter((item) => item.isLeader).length,
+      memberStats
+    };
+  });
+
+  return {
+    roster: PEER_ROSTER,
+    groups,
+    submissions: peerEvalSubmissions.map((submission) => ({
+      id: submission.id,
+      group: submission.group,
+      isLeader: submission.isLeader,
+      voterHash: submission.voterHash,
+      submittedAt: submission.submittedAt,
+      ratings: submission.ratings
+    })),
+    totalSubmissions: peerEvalSubmissions.length,
+    updatedAt: new Date().toLocaleString("zh-CN", { hour12: false })
+  };
+}
+
+function buildPeerEvalCsv() {
+  const rows = [[
+    "提交ID",
+    "匿名评分ID",
+    "评分者组号",
+    "是否组长",
+    "被评分同学",
+    "分数",
+    "提交时间"
+  ]];
+
+  for (const submission of peerEvalSubmissions) {
+    for (const rating of submission.ratings) {
+      rows.push([
+        submission.id,
+        submission.voterHash,
+        `第${submission.group}组`,
+        submission.isLeader ? "是" : "否",
+        rating.name,
+        String(rating.score),
+        new Date(submission.submittedAt).toLocaleString("zh-CN", { hour12: false })
+      ]);
+    }
+  }
+
+  return "\ufeff" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function sendCsv(res, content, filename) {
+  res.writeHead(200, {
+    "Content-Type": "text/csv; charset=utf-8",
+    "Content-Disposition": `attachment; filename="${filename}"`,
+    "Cache-Control": "no-store"
+  });
+  res.end(content);
 }

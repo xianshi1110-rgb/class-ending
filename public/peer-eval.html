@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>小组成员贡献度互评</title>
+  <style>
+    :root {
+      --ink: #1d2738;
+      --muted: #667085;
+      --line: #d9e1ec;
+      --blue: #126ee8;
+      --blue-dark: #0d55b8;
+      --green: #16845b;
+      --bg: #eef4fb;
+      --panel: #fff;
+      --shadow: 0 18px 45px rgba(28, 48, 78, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      background: linear-gradient(150deg, #f9fbff, var(--bg));
+    }
+    button, input, select { font: inherit; }
+    .app { width: min(980px, calc(100% - 28px)); margin: 26px auto; }
+    .hero, .panel {
+      border: 1px solid #c6d4e5;
+      border-radius: 10px;
+      background: rgba(255,255,255,.94);
+      box-shadow: var(--shadow);
+    }
+    .hero { padding: 24px; margin-bottom: 16px; }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 42px); letter-spacing: 0; }
+    .hero p { margin: 0; color: var(--muted); line-height: 1.7; }
+    .panel { padding: 22px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+    label { display: block; font-weight: 800; }
+    .field-label { display: block; margin-bottom: 8px; }
+    select {
+      width: 100%;
+      height: 46px;
+      border: 1px solid #cbd6e2;
+      border-radius: 8px;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .toggle-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .toggle {
+      min-height: 46px;
+      border: 1px solid #cbd6e2;
+      border-radius: 8px;
+      background: #fff;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .toggle.active {
+      border-color: var(--blue);
+      color: #fff;
+      background: var(--blue);
+    }
+    .member-list { display: grid; gap: 12px; margin-top: 12px; }
+    .member-card {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 1.8fr 64px;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+    .member-card strong { font-size: 18px; }
+    input[type="range"] { width: 100%; accent-color: var(--blue); }
+    .score-box {
+      display: grid;
+      place-items: center;
+      min-height: 44px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--green);
+      font-size: 24px;
+      font-weight: 900;
+    }
+    .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+    .btn {
+      min-height: 46px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 18px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 900;
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--blue-dark); }
+    .note { margin-top: 12px; color: var(--muted); line-height: 1.7; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      transform: translateX(-50%) translateY(16px);
+      padding: 12px 18px;
+      border-radius: 8px;
+      color: #fff;
+      background: #202b3d;
+      opacity: 0;
+      transition: .2s ease;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 680px) {
+      .form-grid, .member-card { grid-template-columns: 1fr; }
+      .actions { justify-content: stretch; }
+      .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <h1>小组成员贡献度互评</h1>
+      <p>请选择自己的小组，并标记是否组长；随后为本组每位成员贡献度打分。分数为 0-10 的整数，提交后同一设备再次提交会更新上一份记录。</p>
+    </section>
+
+    <section class="panel">
+      <div class="form-grid">
+        <label>
+          <span class="field-label">所在小组</span>
+          <select id="groupSelect"></select>
+        </label>
+        <label>
+          <span class="field-label">是否组长</span>
+          <div class="toggle-row">
+            <button class="toggle active" type="button" data-leader="false">否</button>
+            <button class="toggle" type="button" data-leader="true">是</button>
+          </div>
+        </label>
+      </div>
+
+      <div id="memberList" class="member-list"></div>
+
+      <p class="note">请根据实际贡献度评分。系统不要求填写姓名，只记录匿名评分ID、组号、是否组长和评分明细。</p>
+      <div class="actions">
+        <button class="btn" type="button" id="submitBtn">提交互评</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const groupSelect = document.querySelector("#groupSelect");
+    const memberList = document.querySelector("#memberList");
+    const submitBtn = document.querySelector("#submitBtn");
+    const toast = document.querySelector("#toast");
+    const voterKey = "peerEvalAnonymousVoterId";
+    let roster = [];
+    let isLeader = false;
+
+    if (!localStorage.getItem(voterKey)) {
+      localStorage.setItem(voterKey, crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+    }
+
+    document.querySelectorAll(".toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        isLeader = button.dataset.leader === "true";
+        document.querySelectorAll(".toggle").forEach((item) => item.classList.toggle("active", item === button));
+      });
+    });
+
+    groupSelect.addEventListener("change", renderMembers);
+    submitBtn.addEventListener("click", submitRatings);
+    loadRoster();
+
+    async function loadRoster() {
+      const response = await fetch("/api/peer-eval/roster");
+      const data = await response.json();
+      roster = data.roster;
+      groupSelect.innerHTML = roster.map((group) => `<option value="${group.group}">第 ${group.group} 组</option>`).join("");
+      renderMembers();
+    }
+
+    function renderMembers() {
+      const group = getCurrentGroup();
+      memberList.innerHTML = group.members.map((name) => `
+        <div class="member-card" data-name="${escapeHtml(name)}">
+          <strong>${escapeHtml(name)}</strong>
+          <input type="range" min="0" max="10" step="1" value="8" aria-label="${escapeHtml(name)}贡献度评分">
+          <div class="score-box">8</div>
+        </div>
+      `).join("");
+
+      memberList.querySelectorAll(".member-card").forEach((card) => {
+        const range = card.querySelector("input");
+        const box = card.querySelector(".score-box");
+        range.addEventListener("input", () => {
+          box.textContent = range.value;
+        });
+      });
+    }
+
+    async function submitRatings() {
+      const group = getCurrentGroup();
+      const ratings = Array.from(memberList.querySelectorAll(".member-card")).map((card) => ({
+        name: card.dataset.name,
+        score: Number(card.querySelector("input").value)
+      }));
+
+      const response = await fetch("/api/peer-eval/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group: group.group,
+          isLeader,
+          voterId: localStorage.getItem(voterKey),
+          ratings
+        })
+      });
+      const result = await response.json();
+      showToast(result.error || (result.updated ? "已更新你的互评记录。" : "互评已提交。"));
+    }
+
+    function getCurrentGroup() {
+      const groupNumber = Number(groupSelect.value || 1);
+      return roster.find((group) => group.group === groupNumber) || roster[0];
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>

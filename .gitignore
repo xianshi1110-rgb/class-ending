@@ -1,5 +1,6 @@
 node_modules/
 scores.json
+peer-eval-results.json
 评分网址.txt
 .env
 .DS_Store

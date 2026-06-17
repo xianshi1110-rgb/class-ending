@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>互评汇总与导出</title>
+  <style>
+    :root {
+      --ink: #1d2738;
+      --muted: #667085;
+      --line: #d9e1ec;
+      --blue: #126ee8;
+      --green: #16845b;
+      --red: #d14343;
+      --bg: #eef4fb;
+      --shadow: 0 18px 45px rgba(28, 48, 78, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+      background: linear-gradient(150deg, #f9fbff, var(--bg));
+    }
+    button { font: inherit; cursor: pointer; }
+    .app { width: min(1220px, calc(100% - 28px)); margin: 26px auto; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); }
+    .topbar p { margin: 0; color: var(--muted); }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .btn {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 16px;
+      color: #fff;
+      background: var(--blue);
+      font-weight: 900;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .btn.danger { background: var(--red); }
+    .panel {
+      border: 1px solid #c6d4e5;
+      border-radius: 10px;
+      padding: 18px;
+      background: rgba(255,255,255,.94);
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fbff;
+    }
+    .metric span, .metric strong { display: block; }
+    .metric span { color: var(--muted); }
+    .metric strong { margin-top: 6px; font-size: 30px; }
+    .group-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .group-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+    }
+    .group-card h2 { margin: 0 0 10px; font-size: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: #4d5868; background: #f5f8fc; font-size: 13px; }
+    .detail-wrap { overflow-x: auto; }
+    .empty { color: var(--muted); padding: 16px; text-align: center; }
+    @media (max-width: 860px) {
+      .topbar { display: block; }
+      .actions { justify-content: flex-start; margin-top: 12px; }
+      .summary, .group-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div>
+        <h1>互评汇总与导出</h1>
+        <p>查看各组成员贡献度平均分，并导出 CSV 明细。</p>
+      </div>
+      <div class="actions">
+        <a class="btn" href="/api/peer-eval/csv">导出 CSV</a>
+        <button class="btn" type="button" id="refreshBtn">刷新</button>
+        <button class="btn danger" type="button" id="resetBtn">清空互评</button>
+      </div>
+    </header>
+
+    <section class="summary" id="summary"></section>
+    <section class="group-grid" id="groupGrid"></section>
+
+    <section class="panel">
+      <h2>评分明细</h2>
+      <div class="detail-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>提交ID</th>
+              <th>匿名评分ID</th>
+              <th>组号</th>
+              <th>是否组长</th>
+              <th>提交时间</th>
+              <th>评分明细</th>
+            </tr>
+          </thead>
+          <tbody id="detailBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const summary = document.querySelector("#summary");
+    const groupGrid = document.querySelector("#groupGrid");
+    const detailBody = document.querySelector("#detailBody");
+    const refreshBtn = document.querySelector("#refreshBtn");
+    const resetBtn = document.querySelector("#resetBtn");
+
+    refreshBtn.addEventListener("click", loadStats);
+    resetBtn.addEventListener("click", resetData);
+    loadStats();
+
+    async function loadStats() {
+      const response = await fetch("/api/peer-eval/stats");
+      const data = await response.json();
+      render(data);
+    }
+
+    function render(data) {
+      const totalMembers = data.roster.reduce((sum, group) => sum + group.members.length, 0);
+      summary.innerHTML = `
+        <div class="metric"><span>提交人数</span><strong>${data.totalSubmissions}</strong></div>
+        <div class="metric"><span>小组数</span><strong>${data.groups.length}</strong></div>
+        <div class="metric"><span>成员数</span><strong>${totalMembers}</strong></div>
+      `;
+
+      groupGrid.innerHTML = data.groups.map((group) => `
+        <article class="group-card">
+          <h2>第 ${group.group} 组 · ${group.submissionCount} 人提交</h2>
+          <table>
+            <thead><tr><th>成员</th><th>平均分</th><th>评分数</th></tr></thead>
+            <tbody>
+              ${group.memberStats.map((member) => `
+                <tr>
+                  <td>${escapeHtml(member.name)}</td>
+                  <td><strong>${member.average.toFixed(2)}</strong></td>
+                  <td>${member.count}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </article>
+      `).join("");
+
+      detailBody.innerHTML = data.submissions.length
+        ? data.submissions.map((submission) => `
+          <tr>
+            <td>${submission.id}</td>
+            <td>${submission.voterHash}</td>
+            <td>第 ${submission.group} 组</td>
+            <td>${submission.isLeader ? "是" : "否"}</td>
+            <td>${new Date(submission.submittedAt).toLocaleString("zh-CN", { hour12: false })}</td>
+            <td>${submission.ratings.map((item) => `${escapeHtml(item.name)}：${item.score}`).join("；")}</td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="6" class="empty">暂无互评提交</td></tr>`;
+    }
+
+    async function resetData() {
+      if (!confirm("确定清空全部互评数据吗？")) return;
+      const pin = prompt("如设置了教师 PIN，请输入；未设置可直接确定。") || "";
+      const response = await fetch("/api/peer-eval/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin })
+      });
+      const result = await response.json();
+      if (result.error) alert(result.error);
+      await loadStats();
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+  </script>
+</body>
+</html>
