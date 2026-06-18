@@ -3,71 +3,254 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>图片游戏 - 学生端</title>
+<title>结课限定 · 好运上上签</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
 
-  .container { max-width: 700px; margin: 0 auto; padding: 20px; }
-
-  h1 { text-align: center; margin: 24px 0 8px; font-size: 26px; color: #1a1a2e; }
-  .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 14px; }
-
-  .name-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-  .name-card {
-    padding: 14px 20px; background: #fff; border: 2px solid #e0e0e0;
-    border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold;
-    transition: all 0.2s; user-select: none; text-align: center; min-width: 80px;
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #fff5f0 0%, #ffe8d6 30%, #fff0e0 60%, #fef5e7 100%);
+    color: #5c3d2e;
+    position: relative;
+    overflow-x: hidden;
   }
-  .name-card:hover { border-color: #4CAF50; background: #e8f5e9; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-  .name-card:active { transform: scale(0.95); }
-  .name-card.picked { background: #e8f5e9; border-color: #81C784; color: #388E3C; }
-  .name-card.picked::after { content: " ✓"; font-size: 12px; }
 
-  .empty { text-align: center; color: #bbb; padding: 60px 0; font-size: 18px; }
+  /* Floating decoration */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(circle at 10% 20%, rgba(255, 183, 77, 0.12) 0%, transparent 50%),
+      radial-gradient(circle at 90% 80%, rgba(255, 138, 101, 0.10) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(255, 215, 0, 0.06) 0%, transparent 60%);
+  }
 
-  /* Overlay */
-  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+  .container { max-width: 700px; margin: 0 auto; padding: 24px 20px; position: relative; z-index: 1; }
+
+  /* ── Header ─────────────────────── */
+  .header {
+    text-align: center; margin-bottom: 32px; padding-top: 16px;
+  }
+  .header .overline {
+    display: inline-block; background: linear-gradient(135deg, #ff8a65, #ff7043);
+    color: #fff; font-size: 12px; letter-spacing: 4px; padding: 6px 16px;
+    border-radius: 20px; margin-bottom: 14px; font-weight: bold;
+  }
+  .header h1 {
+    font-size: 30px;
+    background: linear-gradient(135deg, #d84315, #e65100, #bf360c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px; letter-spacing: 2px;
+  }
+  .header .subtitle {
+    color: #bf8f6e; font-size: 15px;
+  }
+
+  /* ── Decorative divider ────────── */
+  .divider {
+    display: flex; align-items: center; gap: 12px; margin: 0 auto 28px;
+    max-width: 360px; opacity: 0.6;
+  }
+  .divider .line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #d4a574, transparent); }
+  .divider .dot { width: 6px; height: 6px; border-radius: 50%; background: #d4a574; }
+
+  /* ── Name grid ─────────────────── */
+  .name-grid { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+
+  .name-card {
+    padding: 16px 24px;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff9f0 100%);
+    border: 2px solid #f0d6b8;
+    border-radius: 16px;
+    cursor: pointer;
+    font-size: 17px;
+    font-weight: bold;
+    color: #6d4c41;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    text-align: center;
+    min-width: 90px;
+    box-shadow: 0 2px 8px rgba(180, 120, 60, 0.08);
+    position: relative;
+    overflow: hidden;
+  }
+  .name-card::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #ffb74d, #ff8a65, #ffb74d);
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .name-card:hover {
+    border-color: #ff8a65;
+    color: #d84315;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(200, 100, 40, 0.18);
+    background: linear-gradient(180deg, #fff9f0 0%, #fff3e4 100%);
+  }
+  .name-card:hover::before { opacity: 1; }
+  .name-card:active { transform: scale(0.94); }
+
+  .name-card.picked {
+    background: linear-gradient(180deg, #fff3e0 0%, #ffe0b2 100%);
+    border-color: #ffb74d;
+    color: #e65100;
+    box-shadow: inset 0 0 0 1px rgba(255, 152, 0, 0.15);
+  }
+  .name-card.picked::after {
+    content: " 🎉";
+    font-size: 14px;
+  }
+
+  /* ── Empty state ───────────────── */
+  .empty {
+    text-align: center; color: #c9a87c; padding: 60px 0; font-size: 17px;
+  }
+  .empty .icon { font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.6; }
+
+  /* ── Overlay (result popup) ────── */
+  .overlay {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(30, 10, 0, 0.92);
+    flex-direction: column; align-items: center; justify-content: center;
+  }
   .overlay.active { display: flex; }
 
-  .overlay-content { text-align: center; animation: popIn 0.3s ease; }
-  @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .overlay-content {
+    text-align: center;
+    animation: popCelebrate 0.45s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    background: linear-gradient(180deg, #fffbf5 0%, #fff5eb 100%);
+    border-radius: 28px;
+    padding: 32px 28px 24px;
+    margin: 20px;
+    max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 4px rgba(255,183,77,0.3), 0 0 80px rgba(255,138,101,0.15);
+  }
+  @keyframes popCelebrate {
+    0%   { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+    60%  { transform: scale(1.05) rotate(0.5deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+  }
+
+  .overlay .lucky-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #d84315, #e65100);
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 3px;
+    padding: 5px 18px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
 
   .overlay img {
-    max-width: min(500px, 85vw); max-height: min(500px, 60vh);
-    background: #fff; border-radius: 16px; padding: 16px;
-    box-shadow: 0 8px 32px rgba(255,255,255,0.15); object-fit: contain;
+    max-width: min(420px, 78vw);
+    max-height: min(420px, 50vh);
+    background: #fff;
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 0 0 4px rgba(255,183,77,0.25);
+    object-fit: contain;
   }
-  .overlay .img-name { color: #fff; font-size: 24px; margin-top: 16px; font-weight: bold; }
-  .overlay .student-label { color: #ccc; font-size: 16px; margin-top: 4px; }
 
-  .overlay .btn-close { margin-top: 24px; padding: 12px 36px; background: #fff; color: #333; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-  .overlay .btn-close:hover { background: #e0e0e0; }
+  .overlay .img-name {
+    color: #5c3d2e; font-size: 20px; margin-top: 18px; font-weight: bold;
+  }
+  .overlay .student-label {
+    color: #bf8f6e; font-size: 15px; margin-top: 4px;
+  }
+
+  .overlay .btn-close {
+    margin-top: 20px;
+    padding: 12px 42px;
+    background: linear-gradient(135deg, #ff8a65, #f4511e);
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    box-shadow: 0 4px 14px rgba(244, 81, 30, 0.3);
+    letter-spacing: 2px;
+  }
+  .overlay .btn-close:hover {
+    background: linear-gradient(135deg, #ff7043, #d84315);
+    box-shadow: 0 6px 20px rgba(244, 81, 30, 0.4);
+    transform: translateY(-2px);
+  }
   .overlay .btn-close:active { transform: scale(0.95); }
 
-  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 28px; border-radius: 8px; font-size: 15px; z-index: 999; animation: fadeInOut 2.5s forwards; }
-  @keyframes fadeInOut { 0% { opacity: 0; top: 0; } 20% { opacity: 1; top: 20px; } 80% { opacity: 1; top: 20px; } 100% { opacity: 0; top: 0; } }
+  /* ── Confetti burst ────────────── */
+  .confetti {
+    position: fixed; pointer-events: none; z-index: 200;
+  }
+  .confetti-piece {
+    position: absolute; width: 12px; height: 12px; border-radius: 3px;
+    animation: confettiFall 1.2s ease forwards;
+  }
+  @keyframes confettiFall {
+    0%   { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(0); opacity: 0; }
+  }
 
-  .retry-hint { text-align: center; margin-top: 20px; color: #aaa; font-size: 13px; }
+  /* ── Toast ─────────────────────── */
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #5c3d2e; color: #fff; padding: 12px 28px; border-radius: 30px;
+    font-size: 15px; z-index: 999;
+    animation: fadeInOut 2.5s forwards;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  }
+  @keyframes fadeInOut {
+    0% { opacity: 0; top: 0; }
+    20% { opacity: 1; top: 20px; }
+    80% { opacity: 1; top: 20px; }
+    100% { opacity: 0; top: 0; }
+  }
+
+  /* ── Footer hint ───────────────── */
+  .retry-hint { text-align: center; margin-top: 28px; color: #c9a87c; font-size: 13px; }
+
+  /* ── Bouncing stars ────────────── */
+  .sparkle {
+    position: fixed; pointer-events: none; z-index: 0;
+    font-size: 20px; animation: floatUp 4s ease-in infinite; opacity: 0;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+    20%  { opacity: 0.5; }
+    100% { transform: translateY(-100vh) rotate(60deg); opacity: 0; }
+  }
 </style>
 </head>
 <body>
+
 <div class="container">
-  <h1>图片游戏</h1>
-  <p class="subtitle">请点击你的名字，系统会随机分配一张图片</p>
+  <div class="header">
+    <div class="overline">✨ 结课限定 ✨</div>
+    <h1>好运上上签</h1>
+    <p class="subtitle">点击你的名字，抽取属于你的那份好运吧 🍀</p>
+  </div>
+
+  <div class="divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
 
   <div class="name-grid" id="nameGrid">
-    <div class="empty">加载中...</div>
+    <div class="empty"><span class="icon">🎁</span>加载中…</div>
   </div>
-  <p class="retry-hint" id="retryHint" style="display:none">名单中没有你的名字？请联系老师添加。</p>
+  <p class="retry-hint" id="retryHint" style="display:none">名单中没有你的名字？请联系老师添加~</p>
 </div>
 
 <div class="overlay" id="overlay">
   <div class="overlay-content">
-    <img id="overlayImg" src="" alt="图片">
+    <div class="lucky-badge">🎊 恭喜抽中 🎊</div>
+    <br>
+    <img id="overlayImg" src="" alt="好运签">
     <div class="img-name" id="overlayImgName"></div>
     <div class="student-label" id="overlayStudent"></div>
-    <button class="btn-close" onclick="closeOverlay()">关闭</button>
+    <button class="btn-close" onclick="closeOverlay()">收下好运 ✨</button>
   </div>
 </div>
 
@@ -91,13 +274,13 @@ function loadState() {
       renderNameGrid();
     })
     .catch(() => {
-      nameGrid.innerHTML = '<div class="empty">加载失败，请刷新页面</div>';
+      nameGrid.innerHTML = '<div class="empty"><span class="icon">😅</span>加载失败，请刷新页面</div>';
     });
 }
 
 function renderNameGrid() {
   if (students.length === 0) {
-    nameGrid.innerHTML = '<div class="empty">老师还未导入学生名单</div>';
+    nameGrid.innerHTML = '<div class="empty"><span class="icon">🎁</span>老师还未导入学生名单<br>敬请期待…</div>';
     retryHint.style.display = "none";
     return;
   }
@@ -128,6 +311,7 @@ async function pickName(name) {
     });
     const data = await res.json();
     if (data.ok) {
+      burstConfetti();
       showImage(data.image, name);
       loadState();
     } else {
@@ -149,6 +333,45 @@ function closeOverlay() {
   overlay.classList.remove("active");
 }
 
+// ── Confetti ──────────────────────────────────────────────────────────
+function burstConfetti() {
+  const container = document.createElement("div");
+  container.className = "confetti";
+  container.style.left = "50%";
+  container.style.top = "50%";
+  const colors = ["#ff6b6b", "#ffd93d", "#ff8a65", "#ffb74d", "#feca57", "#ff9ff3",
+                  "#ff7043", "#ffab91", "#f4511e", "#ffe082", "#ef5350", "#ffcc80"];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.setProperty("--dx", (Math.random() - 0.5) * 300 + "px");
+    piece.style.setProperty("--dy", (Math.random() * -250 - 50) + "px");
+    piece.style.setProperty("--r", Math.random() * 720 + "deg");
+    piece.style.animationDelay = Math.random() * 0.3 + "s";
+    container.appendChild(piece);
+  }
+  document.body.appendChild(container);
+  setTimeout(() => container.remove(), 1600);
+}
+
+// ── Floating sparkles ─────────────────────────────────────────────────
+function createSparkle() {
+  const el = document.createElement("div");
+  el.className = "sparkle";
+  el.textContent = ["✨", "⭐", "🌟", "💫", "🍀"][Math.floor(Math.random() * 5)];
+  el.style.left = Math.random() * 100 + "%";
+  el.style.top = (80 + Math.random() * 20) + "%";
+  el.style.animationDuration = (3 + Math.random() * 5) + "s";
+  el.style.animationDelay = Math.random() * 4 + "s";
+  document.body.appendChild(el);
+  el.addEventListener("animationend", () => el.remove());
+}
+
+// Create sparkles periodically
+setInterval(() => { if (document.querySelectorAll(".sparkle").length < 6) createSparkle(); }, 2000);
+for (let i = 0; i < 4; i++) setTimeout(createSparkle, i * 600);
+
 function escAttr(s) {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -159,7 +382,6 @@ function escHtml(s) {
   return d.innerHTML;
 }
 
-// Auto-refresh periodically
 setInterval(loadState, 10000);
 loadState();
 </script>
