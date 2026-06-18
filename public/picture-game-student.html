@@ -160,6 +160,10 @@
   .overlay .student-label {
     color: #bf8f6e; font-size: 15px; margin-top: 4px;
   }
+  .overlay .dedication {
+    color: #d84315; font-size: 18px; margin-top: 12px; font-weight: bold;
+    letter-spacing: 1px;
+  }
 
   .overlay .btn-close {
     margin-top: 20px;
@@ -232,7 +236,8 @@
   <div class="header">
     <div class="overline">✨ 结课限定 ✨</div>
     <h1>好运上上签</h1>
-    <p class="subtitle">点击你的名字，抽取属于你的那份好运吧 🍀</p>
+    <p class="subtitle">地规251班《人文地理学研究方法》专属能量站</p>
+    <p class="subtitle" style="font-size:18px;color:#d84315;font-weight:bold;margin-top:4px;">👇 点我抽取 👇</p>
   </div>
 
   <div class="divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
@@ -250,6 +255,7 @@
     <img id="overlayImg" src="" alt="好运签">
     <div class="img-name" id="overlayImgName"></div>
     <div class="student-label" id="overlayStudent"></div>
+    <div class="dedication" id="overlayDedication"></div>
     <button class="btn-close" onclick="closeOverlay()">收下好运 ✨</button>
   </div>
 </div>
@@ -260,6 +266,7 @@ const overlay = document.getElementById("overlay");
 const overlayImg = document.getElementById("overlayImg");
 const overlayImgName = document.getElementById("overlayImgName");
 const overlayStudent = document.getElementById("overlayStudent");
+const overlayDedication = document.getElementById("overlayDedication");
 const retryHint = document.getElementById("retryHint");
 
 let students = [];
@@ -326,6 +333,7 @@ function showImage(image, studentName) {
   overlayImg.src = "/api/picture-game/image/" + image.id;
   overlayImgName.textContent = image.name;
   overlayStudent.textContent = "同学：" + studentName;
+  overlayDedication.textContent = "给" + studentName + "的专属寄语";
   overlay.classList.add("active");
 }
 
