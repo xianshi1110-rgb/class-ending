@@ -102,6 +102,10 @@
     content: " 🎉";
     font-size: 14px;
   }
+  .name-card .count {
+    font-size: 11px; color: #bf8f6e; display: block; margin-top: 2px; font-weight: normal;
+  }
+  .name-card.picked .count { color: #e65100; }
 
   /* ── Empty state ───────────────── */
   .empty {
@@ -144,14 +148,17 @@
     margin-bottom: 16px;
   }
 
-  .overlay img {
-    max-width: min(420px, 78vw);
-    max-height: min(420px, 50vh);
-    background: #fff;
-    border-radius: 18px;
-    padding: 14px;
+  .overlay .images-row {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+  }
+  .overlay .images-row img {
+    max-width: min(200px, 38vw); max-height: min(260px, 38vh);
+    background: #fff; border-radius: 18px; padding: 14px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 0 0 4px rgba(255,183,77,0.25);
     object-fit: contain;
+  }
+  .overlay .images-row img.single {
+    max-width: min(380px, 75vw); max-height: min(420px, 50vh);
   }
 
   .overlay .img-name {
@@ -252,7 +259,7 @@
   <div class="overlay-content">
     <div class="lucky-badge">🎊 恭喜抽中 🎊</div>
     <br>
-    <img id="overlayImg" src="" alt="好运签">
+    <div class="images-row" id="overlayImages"></div>
     <div class="img-name" id="overlayImgName"></div>
     <div class="student-label" id="overlayStudent"></div>
     <div class="dedication" id="overlayDedication"></div>
@@ -263,7 +270,7 @@
 <script>
 const nameGrid = document.getElementById("nameGrid");
 const overlay = document.getElementById("overlay");
-const overlayImg = document.getElementById("overlayImg");
+const overlayImages = document.getElementById("overlayImages");
 const overlayImgName = document.getElementById("overlayImgName");
 const overlayStudent = document.getElementById("overlayStudent");
 const overlayDedication = document.getElementById("overlayDedication");
@@ -295,8 +302,10 @@ function renderNameGrid() {
 
   let html = "";
   students.forEach(s => {
-    const picked = s.imageId !== null;
-    html += `<div class="name-card${picked ? " picked" : ""}" onclick="pickName('${escAttr(s.name)}')">${escHtml(s.name)}</div>`;
+    const ids = s.imageIds || [];
+    const picked = ids.length > 0;
+    const countHtml = ids.length > 0 ? `<span class="count">${ids.length}/2</span>` : "";
+    html += `<div class="name-card${picked ? " picked" : ""}" onclick="pickName('${escAttr(s.name)}')">${escHtml(s.name)}${countHtml}</div>`;
   });
   nameGrid.innerHTML = html;
 }
@@ -318,8 +327,8 @@ async function pickName(name) {
     });
     const data = await res.json();
     if (data.ok) {
-      burstConfetti();
-      showImage(data.image, name);
+      if (!data.full) burstConfetti();
+      showImages(data.images, name);
       loadState();
     } else {
       toast(data.error || "操作失败");
@@ -329,9 +338,14 @@ async function pickName(name) {
   }
 }
 
-function showImage(image, studentName) {
-  overlayImg.src = "/api/picture-game/image/" + image.id;
-  overlayImgName.textContent = image.name;
+function showImages(images, studentName) {
+  const single = images.length === 1;
+  let html = "";
+  images.forEach(img => {
+    html += `<img src="/api/picture-game/image/${img.id}" alt="${img.name}" class="${single ? "single" : ""}">`;
+  });
+  overlayImages.innerHTML = html;
+  overlayImgName.textContent = single ? images[0].name : images[0].name + " · " + images[1].name;
   overlayStudent.textContent = "同学：" + studentName;
   overlayDedication.textContent = "给" + studentName + "的专属寄语";
   overlay.classList.add("active");

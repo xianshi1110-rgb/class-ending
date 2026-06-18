@@ -394,7 +394,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       // Reset assignments
-      for (const s of pictureGameState.students) { s.imageId = null; s.pickedAt = null; }
+      for (const s of pictureGameState.students) { s.imageIds = []; s.pickedAt = []; }
       pictureGameState.updatedAt = new Date().toISOString();
       savePictureGameState();
       broadcastPictureGame();
@@ -423,7 +423,7 @@ const server = http.createServer(async (req, res) => {
       if (names.length === 0) return sendJson(res, { error: "请至少输入一个学生姓名。" }, 400);
 
       const existingNames = new Set(pictureGameState.students.map(s => s.name));
-      const newStudents = names.filter(n => !existingNames.has(n)).map(name => ({ name, imageId: null, pickedAt: null }));
+      const newStudents = names.filter(n => !existingNames.has(n)).map(name => ({ name, imageIds: [], pickedAt: [] }));
       pictureGameState.students = [...pictureGameState.students, ...newStudents];
       pictureGameState.updatedAt = new Date().toISOString();
       savePictureGameState();
@@ -443,14 +443,14 @@ const server = http.createServer(async (req, res) => {
       const result = assignPictureGameImage(name);
       if (!result) return sendJson(res, { error: "未找到该学生姓名。" }, 404);
       if (result.error) return sendJson(res, { error: result.error }, 400);
-      return sendJson(res, { ok: true, image: result.image, student: result.student });
+      return sendJson(res, { ok: true, images: result.images, student: result.student, full: result.full });
     } catch {
       return sendJson(res, { error: "操作失败。" }, 500);
     }
   }
 
   if (req.method === "POST" && url.pathname === "/api/picture-game/reset") {
-    for (const s of pictureGameState.students) { s.imageId = null; s.pickedAt = null; }
+    for (const s of pictureGameState.students) { s.imageIds = []; s.pickedAt = []; }
     pictureGameState.updatedAt = new Date().toISOString();
     savePictureGameState();
     broadcastPictureGame();
@@ -821,23 +821,33 @@ function assignPictureGameImage(studentName) {
   const student = pictureGameState.students.find(s => s.name === studentName);
   if (!student) return null;
 
-  if (student.imageId !== null) {
-    const img = pictureGameState.images.find(i => i.id === student.imageId);
-    return { image: img, student };
+  // Migrate old single-image data
+  if (student.imageIds === undefined) {
+    student.imageIds = student.imageId != null ? [student.imageId] : [];
+    student.pickedAt = student.pickedAt ? [student.pickedAt] : [];
+    delete student.imageId;
+  }
+
+  // Already has 2 images — return existing
+  if (student.imageIds.length >= 2) {
+    const imgs = student.imageIds.map(id => pictureGameState.images.find(i => i.id === id)).filter(Boolean);
+    return { images: imgs, student, full: true };
   }
 
   if (pictureGameState.images.length === 0) return { error: "图片库为空，请等待老师上传PDF。" };
 
-  const usedIds = new Set(pictureGameState.students.filter(s => s.imageId !== null).map(s => s.imageId));
-  const available = pictureGameState.images.filter(i => !usedIds.has(i.id));
+  // Pick an image not yet assigned to this student
+  const myIds = new Set(student.imageIds);
+  const available = pictureGameState.images.filter(i => !myIds.has(i.id));
   const pool = available.length > 0 ? available : pictureGameState.images;
   const picked = pool[Math.floor(Math.random() * pool.length)];
 
-  student.imageId = picked.id;
-  student.pickedAt = new Date().toISOString();
+  student.imageIds.push(picked.id);
+  student.pickedAt.push(new Date().toISOString());
   pictureGameState.updatedAt = new Date().toISOString();
   savePictureGameState();
   broadcastPictureGame();
 
-  return { image: picked, student };
+  const imgs = student.imageIds.map(id => pictureGameState.images.find(i => i.id === id)).filter(Boolean);
+  return { images: imgs, student, full: student.imageIds.length >= 2 };
 }

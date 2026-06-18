@@ -324,12 +324,13 @@ fetch("/api/picture-game/state").then(r => r.json()).then(render).catch(() => {}
 function render(state) {
   const students = state.students || [];
   const images = state.images || [];
-  const picked = students.filter(s => s.imageId !== null).length;
+  const picked = students.filter(s => (s.imageIds || []).length > 0).length;
+  const fullPicked = students.filter(s => (s.imageIds || []).length >= 2).length;
 
   document.getElementById("statImages").textContent = images.length;
   document.getElementById("statTotal").textContent = students.length;
   document.getElementById("statPicked").textContent = picked;
-  document.getElementById("statRemain").textContent = students.length - picked;
+  document.getElementById("statRemain").textContent = students.length - fullPicked;
 
   // Gallery
   if (images.length > 0) {
@@ -351,18 +352,27 @@ function render(state) {
   } else {
     let html = `<table><thead><tr><th>#</th><th>姓名</th><th>状态</th><th>图片</th><th>抽取时间</th></tr></thead><tbody>`;
     students.forEach((s, i) => {
-      const picked = s.imageId !== null;
-      const imgMeta = images.find(im => im.id === s.imageId);
-      const imgHtml = imgMeta
-        ? `<img class="img-thumb" src="/api/picture-game/image/${imgMeta.id}" alt="${imgMeta.name}">`
+      const ids = s.imageIds || [];
+      const pickedCount = ids.length;
+      let statusText, statusCls;
+      if (pickedCount >= 2) { statusText = "已抽满"; statusCls = "status-picked"; }
+      else if (pickedCount === 1) { statusText = "1/2"; statusCls = "status-picked"; }
+      else { statusText = "未抽取"; statusCls = "status-waiting"; }
+
+      const imgMetas = ids.map(id => images.find(im => im.id === id)).filter(Boolean);
+      const imgHtml = imgMetas.length > 0
+        ? imgMetas.map(im => `<img class="img-thumb" src="/api/picture-game/image/${im.id}" alt="${im.name}">`).join("")
         : "—";
-      const timeHtml = s.pickedAt
-        ? new Date(s.pickedAt).toLocaleString("zh-CN", { hour12: false })
+
+      const times = s.pickedAt || [];
+      const timeHtml = times.length > 0
+        ? times.map(t => new Date(t).toLocaleString("zh-CN", { hour12: false })).join("<br>")
         : "—";
+
       html += `<tr>
         <td>${i + 1}</td>
         <td><strong>${esc(s.name)}</strong></td>
-        <td class="${picked ? "status-picked" : "status-waiting"}">${picked ? "已抽取" : "未抽取"}</td>
+        <td class="${statusCls}">${statusText}</td>
         <td>${imgHtml}</td>
         <td style="font-size:12px;color:#888">${timeHtml}</td>
       </tr>`;
