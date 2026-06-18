@@ -79,14 +79,14 @@
   <h1>图片游戏 · 教师后台</h1>
   <p class="subtitle">上传 PDF → 自动拆页 → 学生随机抽取图片</p>
 
-  <!-- Upload PDF -->
+  <!-- Upload images -->
   <div class="card">
-    <div class="card-title">上传 PDF 图片库</div>
-    <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfInput').click()">
-      <div class="icon">📄</div>
-      <p>点击此处选择 PDF 文件，或将文件拖拽到此处</p>
-      <p style="font-size:12px;color:#bbb;margin-top:4px;">PDF 的每一页将被转换成一张图片</p>
-      <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="handlePdfSelect(event)">
+    <div class="card-title">上传图片库</div>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">🖼️</div>
+      <p>点击此处选择图片或 PDF 文件，或将文件拖拽到此处</p>
+      <p style="font-size:12px;color:#bbb;margin-top:4px;">支持 JPG / PNG / GIF / WebP 图片，或 PDF（每页转图片）</p>
+      <input type="file" id="fileInput" accept="image/*,.pdf" multiple style="display:none" onchange="handleFileSelect(event)">
     </div>
     <div class="progress-bar" id="progressBar" style="display:none">
       <div class="fill" id="progressFill" style="width:0%"></div>
@@ -155,51 +155,60 @@ uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag
 uploadArea.addEventListener("drop", e => {
   e.preventDefault();
   uploadArea.classList.remove("drag");
-  const file = e.dataTransfer.files[0];
-  if (file && file.type === "application/pdf") processPdf(file);
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length > 0) processFiles(files);
 });
 
-// ── PDF processing ───────────────────────────────────────────────────
-function handlePdfSelect(e) {
-  const file = e.target.files[0];
-  if (file) processPdf(file);
+// ── File processing ──────────────────────────────────────────────────
+function handleFileSelect(e) {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) processFiles(files);
 }
 
-async function processPdf(file) {
-  uploadStatus.textContent = "正在读取 PDF...";
+async function processFiles(files) {
+  uploadStatus.textContent = "正在处理...";
   progressBar.style.display = "block";
   progressFill.style.width = "0%";
 
   try {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const totalPages = pdf.numPages;
+    let pages = [];
 
-    uploadStatus.textContent = `共 ${totalPages} 页，正在逐页转换...`;
-    const pages = [];
+    for (let fi = 0; fi < files.length; fi++) {
+      const file = files[fi];
+      const pctBase = Math.round((fi / files.length) * 80);
 
-    for (let i = 1; i <= totalPages; i++) {
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext("2d");
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-
-      // Convert to JPEG (smaller than PNG for photos/scanned docs)
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      pages.push(dataUrl);
-
-      const pct = Math.round((i / totalPages) * 80);
-      progressFill.style.width = pct + "%";
+      if (file.type === "application/pdf") {
+        uploadStatus.textContent = `正在读取 PDF (${fi + 1}/${files.length})...`;
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1.5 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+          pages.push(canvas.toDataURL("image/jpeg", 0.85));
+        }
+      } else if (file.type.startsWith("image/")) {
+        uploadStatus.textContent = `正在处理图片 (${fi + 1}/${files.length})...`;
+        const dataUrl = await readImageAsJpeg(file);
+        pages.push(dataUrl);
+      } else {
+        continue; // Skip unsupported files
+      }
+      progressFill.style.width = (pctBase + Math.round(80 / files.length)) + "%";
     }
 
-    uploadStatus.textContent = `正在上传 ${totalPages} 页到服务器...`;
+    if (pages.length === 0) {
+      uploadStatus.textContent = "未识别到有效的图片或 PDF 文件";
+      progressFill.style.width = "0%";
+      return;
+    }
+
+    uploadStatus.textContent = `正在上传 ${pages.length} 张图片到服务器...`;
     progressFill.style.width = "90%";
 
-    // Upload to server
     const res = await fetch("/api/picture-game/upload-pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -210,16 +219,38 @@ async function processPdf(file) {
     if (data.ok) {
       progressFill.style.width = "100%";
       uploadStatus.textContent = `上传成功！共 ${data.count} 张图片`;
-      toast(`PDF 已转换为 ${data.count} 张图片`);
+      toast(`已导入 ${data.count} 张图片`);
     } else {
       uploadStatus.textContent = "上传失败：" + (data.error || "未知错误");
       progressFill.style.width = "0%";
     }
   } catch (err) {
-    uploadStatus.textContent = "处理 PDF 时出错：" + err.message;
+    uploadStatus.textContent = "处理文件时出错：" + err.message;
     progressFill.style.width = "0%";
     console.error(err);
   }
+}
+
+function readImageAsJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 1600, maxH = 1600;
+      let w = img.width, h = img.height;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.88));
+    };
+    img.onerror = () => reject(new Error("无法读取图片: " + file.name));
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // ── Toast ────────────────────────────────────────────────────────────
