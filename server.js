@@ -33,9 +33,15 @@ const PEER_ROSTER = [
   { group: 9, members: ["张超越"] }
 ];
 
+const PICTURE_GAME_STATE_FILE = path.join(__dirname, "picture-game-state.json");
+const PICTURE_GAME_IMAGES_DIR = path.join(__dirname, "picture-game-images");
+const pictureGameSseClients = new Set();
+if (!fs.existsSync(PICTURE_GAME_IMAGES_DIR)) fs.mkdirSync(PICTURE_GAME_IMAGES_DIR, { recursive: true });
+
 let votes = loadVotes();
 let charadesV2State = loadCharadesV2State();
 let peerEvalSubmissions = loadPeerEvalSubmissions();
+let pictureGameState = loadPictureGameState();
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -329,6 +335,135 @@ const server = http.createServer(async (req, res) => {
     }
     peerEvalSubmissions = [];
     savePeerEvalSubmissions();
+    return sendJson(res, { ok: true });
+  }
+
+  // --- picture game routes ---
+
+  if (req.method === "GET" && url.pathname === "/picture-game") {
+    return serveFile(res, path.join(PUBLIC_DIR, "picture-game-student.html"));
+  }
+
+  if (req.method === "GET" && url.pathname === "/picture-game/teacher") {
+    return serveFile(res, path.join(PUBLIC_DIR, "picture-game-teacher.html"));
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/picture-game/state") {
+    return sendJson(res, buildPictureGamePublicState());
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/picture-game/events") {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive"
+    });
+    res.write(`data: ${JSON.stringify(buildPictureGamePublicState())}\n\n`);
+    pictureGameSseClients.add(res);
+    req.on("close", () => pictureGameSseClients.delete(res));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/picture-game/upload-pdf") {
+    try {
+      const body = await readJson(req);
+      const pages = body.pages;
+      if (!pages || !Array.isArray(pages) || pages.length === 0) {
+        return sendJson(res, { error: "未收到有效的图片数据。" }, 400);
+      }
+
+      // Clear old images
+      for (const oldImg of pictureGameState.images) {
+        const oldPath = path.join(PICTURE_GAME_IMAGES_DIR, `${oldImg.id}.${oldImg.ext}`);
+        try { fs.unlinkSync(oldPath); } catch {}
+      }
+      pictureGameState.images = [];
+      pictureGameState.nextImageId = 1;
+
+      // Save new images
+      for (let i = 0; i < pages.length; i++) {
+        const dataUrl = pages[i];
+        const match = dataUrl.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+        if (!match) continue;
+
+        const ext = match[1] === "png" ? "png" : "jpg";
+        const buffer = Buffer.from(match[2], "base64");
+        const id = pictureGameState.nextImageId++;
+        fs.writeFileSync(path.join(PICTURE_GAME_IMAGES_DIR, `${id}.${ext}`), buffer);
+        pictureGameState.images.push({ id, name: `第 ${i + 1} 页`, ext });
+      }
+
+      // Reset assignments
+      for (const s of pictureGameState.students) { s.imageId = null; s.pickedAt = null; }
+      pictureGameState.updatedAt = new Date().toISOString();
+      savePictureGameState();
+      broadcastPictureGame();
+      return sendJson(res, { ok: true, count: pictureGameState.images.length });
+    } catch {
+      return sendJson(res, { error: "上传失败。" }, 500);
+    }
+  }
+
+  if (req.method === "GET" && url.pathname.startsWith("/api/picture-game/image/")) {
+    const idStr = url.pathname.split("/").pop();
+    const id = Number.parseInt(idStr, 10);
+    const img = pictureGameState.images.find(i => i.id === id);
+    if (!img) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Image not found");
+      return;
+    }
+    return serveFile(res, path.join(PICTURE_GAME_IMAGES_DIR, `${img.id}.${img.ext}`));
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/picture-game/import") {
+    try {
+      const body = await readJson(req);
+      const names = (body.names || []).map(n => String(n).trim()).filter(n => n.length > 0);
+      if (names.length === 0) return sendJson(res, { error: "请至少输入一个学生姓名。" }, 400);
+
+      const existingNames = new Set(pictureGameState.students.map(s => s.name));
+      const newStudents = names.filter(n => !existingNames.has(n)).map(name => ({ name, imageId: null, pickedAt: null }));
+      pictureGameState.students = [...pictureGameState.students, ...newStudents];
+      pictureGameState.updatedAt = new Date().toISOString();
+      savePictureGameState();
+      broadcastPictureGame();
+      return sendJson(res, { ok: true, added: newStudents.length, total: pictureGameState.students.length });
+    } catch {
+      return sendJson(res, { error: "导入失败。" }, 500);
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/picture-game/pick") {
+    try {
+      const body = await readJson(req);
+      const name = String(body.name || "").trim();
+      if (!name) return sendJson(res, { error: "请提供学生姓名。" }, 400);
+
+      const result = assignPictureGameImage(name);
+      if (!result) return sendJson(res, { error: "未找到该学生姓名。" }, 404);
+      if (result.error) return sendJson(res, { error: result.error }, 400);
+      return sendJson(res, { ok: true, image: result.image, student: result.student });
+    } catch {
+      return sendJson(res, { error: "操作失败。" }, 500);
+    }
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/picture-game/reset") {
+    for (const s of pictureGameState.students) { s.imageId = null; s.pickedAt = null; }
+    pictureGameState.updatedAt = new Date().toISOString();
+    savePictureGameState();
+    broadcastPictureGame();
+    return sendJson(res, { ok: true });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/picture-game/clear") {
+    for (const img of pictureGameState.images) {
+      try { fs.unlinkSync(path.join(PICTURE_GAME_IMAGES_DIR, `${img.id}.${img.ext}`)); } catch {}
+    }
+    pictureGameState = defaultPictureGameState();
+    savePictureGameState();
+    broadcastPictureGame();
     return sendJson(res, { ok: true });
   }
 
@@ -642,4 +777,67 @@ function sendCsv(res, content, filename) {
     "Cache-Control": "no-store"
   });
   res.end(content);
+}
+
+// ── Picture game state ────────────────────────────────────────────────
+
+function defaultPictureGameState() {
+  return {
+    images: [],
+    nextImageId: 1,
+    students: [],
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function loadPictureGameState() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PICTURE_GAME_STATE_FILE, "utf8"));
+    if (!raw.students || !Array.isArray(raw.students)) throw new Error("invalid");
+    return raw;
+  } catch {
+    return defaultPictureGameState();
+  }
+}
+
+function savePictureGameState() {
+  fs.writeFileSync(PICTURE_GAME_STATE_FILE, JSON.stringify(pictureGameState, null, 2), "utf8");
+}
+
+function buildPictureGamePublicState() {
+  return {
+    images: pictureGameState.images,
+    students: pictureGameState.students,
+    updatedAt: pictureGameState.updatedAt
+  };
+}
+
+function broadcastPictureGame() {
+  const msg = `data: ${JSON.stringify(buildPictureGamePublicState())}\n\n`;
+  for (const c of pictureGameSseClients) c.write(msg);
+}
+
+function assignPictureGameImage(studentName) {
+  const student = pictureGameState.students.find(s => s.name === studentName);
+  if (!student) return null;
+
+  if (student.imageId !== null) {
+    const img = pictureGameState.images.find(i => i.id === student.imageId);
+    return { image: img, student };
+  }
+
+  if (pictureGameState.images.length === 0) return { error: "图片库为空，请等待老师上传PDF。" };
+
+  const usedIds = new Set(pictureGameState.students.filter(s => s.imageId !== null).map(s => s.imageId));
+  const available = pictureGameState.images.filter(i => !usedIds.has(i.id));
+  const pool = available.length > 0 ? available : pictureGameState.images;
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+
+  student.imageId = picked.id;
+  student.pickedAt = new Date().toISOString();
+  pictureGameState.updatedAt = new Date().toISOString();
+  savePictureGameState();
+  broadcastPictureGame();
+
+  return { image: picked, student };
 }

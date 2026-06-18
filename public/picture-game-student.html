@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片游戏 - 学生端</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+  .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+
+  h1 { text-align: center; margin: 24px 0 8px; font-size: 26px; color: #1a1a2e; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 14px; }
+
+  .name-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .name-card {
+    padding: 14px 20px; background: #fff; border: 2px solid #e0e0e0;
+    border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold;
+    transition: all 0.2s; user-select: none; text-align: center; min-width: 80px;
+  }
+  .name-card:hover { border-color: #4CAF50; background: #e8f5e9; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .name-card:active { transform: scale(0.95); }
+  .name-card.picked { background: #e8f5e9; border-color: #81C784; color: #388E3C; }
+  .name-card.picked::after { content: " ✓"; font-size: 12px; }
+
+  .empty { text-align: center; color: #bbb; padding: 60px 0; font-size: 18px; }
+
+  /* Overlay */
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+  .overlay.active { display: flex; }
+
+  .overlay-content { text-align: center; animation: popIn 0.3s ease; }
+  @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+  .overlay img {
+    max-width: min(500px, 85vw); max-height: min(500px, 60vh);
+    background: #fff; border-radius: 16px; padding: 16px;
+    box-shadow: 0 8px 32px rgba(255,255,255,0.15); object-fit: contain;
+  }
+  .overlay .img-name { color: #fff; font-size: 24px; margin-top: 16px; font-weight: bold; }
+  .overlay .student-label { color: #ccc; font-size: 16px; margin-top: 4px; }
+
+  .overlay .btn-close { margin-top: 24px; padding: 12px 36px; background: #fff; color: #333; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .overlay .btn-close:hover { background: #e0e0e0; }
+  .overlay .btn-close:active { transform: scale(0.95); }
+
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 28px; border-radius: 8px; font-size: 15px; z-index: 999; animation: fadeInOut 2.5s forwards; }
+  @keyframes fadeInOut { 0% { opacity: 0; top: 0; } 20% { opacity: 1; top: 20px; } 80% { opacity: 1; top: 20px; } 100% { opacity: 0; top: 0; } }
+
+  .retry-hint { text-align: center; margin-top: 20px; color: #aaa; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>图片游戏</h1>
+  <p class="subtitle">请点击你的名字，系统会随机分配一张图片</p>
+
+  <div class="name-grid" id="nameGrid">
+    <div class="empty">加载中...</div>
+  </div>
+  <p class="retry-hint" id="retryHint" style="display:none">名单中没有你的名字？请联系老师添加。</p>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="overlay-content">
+    <img id="overlayImg" src="" alt="图片">
+    <div class="img-name" id="overlayImgName"></div>
+    <div class="student-label" id="overlayStudent"></div>
+    <button class="btn-close" onclick="closeOverlay()">关闭</button>
+  </div>
+</div>
+
+<script>
+const nameGrid = document.getElementById("nameGrid");
+const overlay = document.getElementById("overlay");
+const overlayImg = document.getElementById("overlayImg");
+const overlayImgName = document.getElementById("overlayImgName");
+const overlayStudent = document.getElementById("overlayStudent");
+const retryHint = document.getElementById("retryHint");
+
+let students = [];
+let images = [];
+
+function loadState() {
+  fetch("/api/picture-game/state")
+    .then(r => r.json())
+    .then(state => {
+      students = state.students || [];
+      images = state.images || [];
+      renderNameGrid();
+    })
+    .catch(() => {
+      nameGrid.innerHTML = '<div class="empty">加载失败，请刷新页面</div>';
+    });
+}
+
+function renderNameGrid() {
+  if (students.length === 0) {
+    nameGrid.innerHTML = '<div class="empty">老师还未导入学生名单</div>';
+    retryHint.style.display = "none";
+    return;
+  }
+  retryHint.style.display = "block";
+
+  let html = "";
+  students.forEach(s => {
+    const picked = s.imageId !== null;
+    html += `<div class="name-card${picked ? " picked" : ""}" onclick="pickName('${escAttr(s.name)}')">${escHtml(s.name)}</div>`;
+  });
+  nameGrid.innerHTML = html;
+}
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+async function pickName(name) {
+  try {
+    const res = await fetch("/api/picture-game/pick", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showImage(data.image, name);
+      loadState();
+    } else {
+      toast(data.error || "操作失败");
+    }
+  } catch {
+    toast("网络错误，请重试");
+  }
+}
+
+function showImage(image, studentName) {
+  overlayImg.src = "/api/picture-game/image/" + image.id;
+  overlayImgName.textContent = image.name;
+  overlayStudent.textContent = "同学：" + studentName;
+  overlay.classList.add("active");
+}
+
+function closeOverlay() {
+  overlay.classList.remove("active");
+}
+
+function escAttr(s) {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Auto-refresh periodically
+setInterval(loadState, 10000);
+loadState();
+</script>
+</body>
+</html>

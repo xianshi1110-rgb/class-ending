@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>图片游戏 - 教师后台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+
+  h1 { text-align: center; margin: 20px 0 10px; font-size: 28px; color: #1a1a2e; }
+  .subtitle { text-align: center; color: #888; margin-bottom: 24px; font-size: 14px; }
+
+  .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .card-title { font-size: 18px; font-weight: bold; margin-bottom: 14px; color: #1a1a2e; border-left: 4px solid #4CAF50; padding-left: 10px; }
+
+  label { display: block; margin-bottom: 6px; font-weight: bold; color: #555; }
+
+  textarea { width: 100%; height: 120px; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; resize: vertical; font-family: inherit; }
+  textarea:focus { outline: none; border-color: #4CAF50; }
+
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+
+  .btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; transition: all 0.2s; font-family: inherit; font-weight: bold; }
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: #4CAF50; color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #43A047; }
+  .btn-warn { background: #FF9800; color: #fff; }
+  .btn-warn:hover:not(:disabled) { background: #F57C00; }
+  .btn-danger { background: #ef5350; color: #fff; }
+  .btn-danger:hover:not(:disabled) { background: #e53935; }
+  .btn-outline { background: #fff; color: #4CAF50; border: 2px solid #4CAF50; }
+  .btn-outline:hover:not(:disabled) { background: #e8f5e9; }
+
+  .upload-area {
+    border: 2px dashed #ccc; border-radius: 12px; padding: 30px; text-align: center;
+    cursor: pointer; transition: all 0.2s; margin-top: 8px;
+  }
+  .upload-area:hover, .upload-area.drag { border-color: #4CAF50; background: #e8f5e9; }
+  .upload-area p { color: #888; font-size: 15px; }
+  .upload-area .icon { font-size: 40px; margin-bottom: 8px; }
+
+  .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; margin-top: 12px; overflow: hidden; }
+  .progress-bar .fill { height: 100%; background: #4CAF50; border-radius: 4px; transition: width 0.3s; }
+
+  .gallery { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .gallery-item { width: 100px; text-align: center; }
+  .gallery-item img { width: 100px; height: 140px; object-fit: cover; border-radius: 6px; border: 2px solid #eee; }
+  .gallery-item .lbl { font-size: 11px; color: #888; margin-top: 4px; }
+
+  .stats { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; }
+  .stat-item { background: #f5f5f5; padding: 10px 20px; border-radius: 8px; text-align: center; }
+  .stat-val { font-size: 24px; font-weight: bold; color: #4CAF50; }
+  .stat-lbl { font-size: 12px; color: #888; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+  th { background: #fafafa; font-weight: bold; color: #555; }
+
+  .status-picked { color: #4CAF50; font-weight: bold; }
+  .status-waiting { color: #bbb; }
+  .img-thumb { width: 50px; height: 70px; border-radius: 6px; border: 2px solid #eee; object-fit: cover; background: #fafafa; }
+
+  .empty { text-align: center; color: #bbb; padding: 40px 0; }
+
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 28px; border-radius: 8px; font-size: 15px; z-index: 999; animation: fadeInOut 2.5s forwards; }
+  @keyframes fadeInOut {
+    0% { opacity: 0; top: 0; } 20% { opacity: 1; top: 20px; } 80% { opacity: 1; top: 20px; } 100% { opacity: 0; top: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>图片游戏 · 教师后台</h1>
+  <p class="subtitle">上传 PDF → 自动拆页 → 学生随机抽取图片</p>
+
+  <!-- Upload PDF -->
+  <div class="card">
+    <div class="card-title">上传 PDF 图片库</div>
+    <div class="upload-area" id="uploadArea" onclick="document.getElementById('pdfInput').click()">
+      <div class="icon">📄</div>
+      <p>点击此处选择 PDF 文件，或将文件拖拽到此处</p>
+      <p style="font-size:12px;color:#bbb;margin-top:4px;">PDF 的每一页将被转换成一张图片</p>
+      <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="handlePdfSelect(event)">
+    </div>
+    <div class="progress-bar" id="progressBar" style="display:none">
+      <div class="fill" id="progressFill" style="width:0%"></div>
+    </div>
+    <p id="uploadStatus" style="margin-top:8px;font-size:13px;color:#888;"></p>
+    <div class="gallery" id="gallery"></div>
+  </div>
+
+  <!-- Import names -->
+  <div class="card">
+    <div class="card-title">导入学生名单</div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-primary" onclick="document.getElementById('excelInput').click()">📊 上传 Excel 文件</button>
+      <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none" onchange="handleExcelSelect(event)">
+      <span style="font-size:13px;color:#888;line-height:38px;">或手动输入</span>
+    </div>
+    <label>每行一个姓名，或用中文逗号/英文逗号分隔</label>
+    <textarea id="nameInput" placeholder="张三&#10;李四&#10;王五&#10;..."></textarea>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="importNames()">导入名单</button>
+      <button class="btn btn-outline" onclick="nameInput.value='';nameInput.focus()">清空输入</button>
+    </div>
+  </div>
+
+  <!-- Student status -->
+  <div class="card">
+    <div class="card-title">学生状态</div>
+    <div class="stats">
+      <div class="stat-item"><div class="stat-val" id="statImages">0</div><div class="stat-lbl">图片总数</div></div>
+      <div class="stat-item"><div class="stat-val" id="statTotal">0</div><div class="stat-lbl">学生总数</div></div>
+      <div class="stat-item"><div class="stat-val" id="statPicked">0</div><div class="stat-lbl">已抽取</div></div>
+      <div class="stat-item"><div class="stat-val" id="statRemain">0</div><div class="stat-lbl">未抽取</div></div>
+    </div>
+    <div id="studentTable"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="card">
+    <div class="card-title">操作</div>
+    <div class="btn-row">
+      <button class="btn btn-warn" onclick="resetAssignments()">重置所有分配</button>
+      <button class="btn btn-danger" onclick="clearAll()">清空全部数据</button>
+    </div>
+    <p style="margin-top:10px;color:#888;font-size:13px;">
+      学生端地址：<strong id="studentUrl">—</strong>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:13px;margin-left:8px;" onclick="copyUrl()">复制链接</button>
+    </p>
+  </div>
+</div>
+
+<script>
+const nameInput = document.getElementById("nameInput");
+const studentTable = document.getElementById("studentTable");
+const gallery = document.getElementById("gallery");
+const uploadStatus = document.getElementById("uploadStatus");
+const progressBar = document.getElementById("progressBar");
+const progressFill = document.getElementById("progressFill");
+const origin = location.origin;
+
+document.getElementById("studentUrl").textContent = origin + "/picture-game";
+
+// ── Drag & drop ──────────────────────────────────────────────────────
+const uploadArea = document.getElementById("uploadArea");
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("drag"); });
+uploadArea.addEventListener("dragleave", () => uploadArea.classList.remove("drag"));
+uploadArea.addEventListener("drop", e => {
+  e.preventDefault();
+  uploadArea.classList.remove("drag");
+  const file = e.dataTransfer.files[0];
+  if (file && file.type === "application/pdf") processPdf(file);
+});
+
+// ── PDF processing ───────────────────────────────────────────────────
+function handlePdfSelect(e) {
+  const file = e.target.files[0];
+  if (file) processPdf(file);
+}
+
+async function processPdf(file) {
+  uploadStatus.textContent = "正在读取 PDF...";
+  progressBar.style.display = "block";
+  progressFill.style.width = "0%";
+
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const totalPages = pdf.numPages;
+
+    uploadStatus.textContent = `共 ${totalPages} 页，正在逐页转换...`;
+    const pages = [];
+
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext("2d");
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Convert to JPEG (smaller than PNG for photos/scanned docs)
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      pages.push(dataUrl);
+
+      const pct = Math.round((i / totalPages) * 80);
+      progressFill.style.width = pct + "%";
+    }
+
+    uploadStatus.textContent = `正在上传 ${totalPages} 页到服务器...`;
+    progressFill.style.width = "90%";
+
+    // Upload to server
+    const res = await fetch("/api/picture-game/upload-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pages })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      progressFill.style.width = "100%";
+      uploadStatus.textContent = `上传成功！共 ${data.count} 张图片`;
+      toast(`PDF 已转换为 ${data.count} 张图片`);
+    } else {
+      uploadStatus.textContent = "上传失败：" + (data.error || "未知错误");
+      progressFill.style.width = "0%";
+    }
+  } catch (err) {
+    uploadStatus.textContent = "处理 PDF 时出错：" + err.message;
+    progressFill.style.width = "0%";
+    console.error(err);
+  }
+}
+
+// ── Toast ────────────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+
+function copyUrl() {
+  navigator.clipboard.writeText(origin + "/picture-game").then(() => toast("链接已复制！"));
+}
+
+// ── Excel import ─────────────────────────────────────────────────────
+function handleExcelSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+      // Collect all non-empty cells from all rows
+      const names = [];
+      for (const row of rows) {
+        if (!row || !Array.isArray(row)) continue;
+        for (const cell of row) {
+          const val = String(cell ?? "").trim();
+          if (val.length > 0 && val !== "姓名" && val !== "名字" && val !== "序号" && val !== "学号") {
+            names.push(val);
+          }
+        }
+      }
+
+      if (names.length === 0) {
+        toast("未能从 Excel 中提取到有效姓名");
+        return;
+      }
+
+      // Populate textarea and auto-import
+      nameInput.value = names.join("\n");
+      toast(`从 Excel 中提取到 ${names.length} 个姓名`);
+    } catch (err) {
+      toast("解析 Excel 文件失败：" + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── API calls ────────────────────────────────────────────────────────
+async function importNames() {
+  const raw = nameInput.value.trim();
+  if (!raw) return toast("请先输入学生名单");
+  const names = raw.split(/[\n,，]+/).map(n => n.trim()).filter(n => n.length > 0);
+  if (names.length === 0) return toast("未识别到有效姓名");
+  try {
+    const res = await fetch("/api/picture-game/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names })
+    });
+    const data = await res.json();
+    if (data.ok) { toast(`导入 ${data.added} 名学生（共 ${data.total} 人）`); nameInput.value = ""; }
+    else toast(data.error || "导入失败");
+  } catch { toast("网络错误"); }
+}
+
+async function resetAssignments() {
+  if (!confirm("确定要重置所有学生的图片分配吗？学生名单会保留。")) return;
+  try {
+    await fetch("/api/picture-game/reset", { method: "POST" });
+    toast("已重置所有分配");
+  } catch { toast("操作失败"); }
+}
+
+async function clearAll() {
+  if (!confirm("确定要清空全部数据（图片库 + 学生名单）吗？此操作不可恢复！")) return;
+  try {
+    await fetch("/api/picture-game/clear", { method: "POST" });
+    toast("已清空全部数据");
+  } catch { toast("操作失败"); }
+}
+
+// ── SSE ──────────────────────────────────────────────────────────────
+function connectSSE() {
+  const evt = new EventSource("/api/picture-game/events");
+  evt.onmessage = (e) => {
+    try { render(JSON.parse(e.data)); } catch {}
+  };
+  evt.onerror = () => setTimeout(connectSSE, 3000);
+}
+
+// ── Initial load ─────────────────────────────────────────────────────
+fetch("/api/picture-game/state").then(r => r.json()).then(render).catch(() => {});
+
+function render(state) {
+  const students = state.students || [];
+  const images = state.images || [];
+  const picked = students.filter(s => s.imageId !== null).length;
+
+  document.getElementById("statImages").textContent = images.length;
+  document.getElementById("statTotal").textContent = students.length;
+  document.getElementById("statPicked").textContent = picked;
+  document.getElementById("statRemain").textContent = students.length - picked;
+
+  // Gallery
+  if (images.length > 0) {
+    let ghtml = "";
+    images.forEach(img => {
+      ghtml += `<div class="gallery-item">
+        <img src="/api/picture-game/image/${img.id}" alt="${img.name}">
+        <div class="lbl">${img.name}</div>
+      </div>`;
+    });
+    gallery.innerHTML = ghtml;
+  } else {
+    gallery.innerHTML = '<div class="empty" style="padding:10px">暂无图片，请上传 PDF</div>';
+  }
+
+  // Student table
+  if (students.length === 0) {
+    studentTable.innerHTML = '<div class="empty">暂无学生数据，请先导入名单</div>';
+  } else {
+    let html = `<table><thead><tr><th>#</th><th>姓名</th><th>状态</th><th>图片</th><th>抽取时间</th></tr></thead><tbody>`;
+    students.forEach((s, i) => {
+      const picked = s.imageId !== null;
+      const imgMeta = images.find(im => im.id === s.imageId);
+      const imgHtml = imgMeta
+        ? `<img class="img-thumb" src="/api/picture-game/image/${imgMeta.id}" alt="${imgMeta.name}">`
+        : "—";
+      const timeHtml = s.pickedAt
+        ? new Date(s.pickedAt).toLocaleString("zh-CN", { hour12: false })
+        : "—";
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td class="${picked ? "status-picked" : "status-waiting"}">${picked ? "已抽取" : "未抽取"}</td>
+        <td>${imgHtml}</td>
+        <td style="font-size:12px;color:#888">${timeHtml}</td>
+      </tr>`;
+    });
+    html += "</tbody></table>";
+    studentTable.innerHTML = html;
+  }
+}
+
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+connectSSE();
+</script>
+</body>
+</html>

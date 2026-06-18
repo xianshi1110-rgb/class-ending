@@ -5,7 +5,8 @@
   "description": "课堂汇报匿名评分与教师实时看板",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "start:picture-game": "node picture-game-server.js"
   },
   "engines": {
     "node": ">=18"
