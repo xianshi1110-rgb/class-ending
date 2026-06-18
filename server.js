@@ -366,7 +366,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === "POST" && url.pathname === "/api/picture-game/upload-pdf") {
     try {
-      const body = await readJson(req);
+      const body = await readJson(req, 50 * 1024 * 1024);
       const pages = body.pages;
       if (!pages || !Array.isArray(pages) || pages.length === 0) {
         return sendJson(res, { error: "未收到有效的图片数据。" }, 400);
@@ -399,8 +399,8 @@ const server = http.createServer(async (req, res) => {
       savePictureGameState();
       broadcastPictureGame();
       return sendJson(res, { ok: true, count: pictureGameState.images.length });
-    } catch {
-      return sendJson(res, { error: "上传失败。" }, 500);
+    } catch (e) {
+      return sendJson(res, { error: e.message === "Request too large" ? "图片数据过大，请减少图片数量或降低分辨率后重试。" : "上传失败。" }, 500);
     }
   }
 
@@ -533,13 +533,14 @@ function buildStats() {
   };
 }
 
-function readJson(req) {
+function readJson(req, maxBytes = 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1024 * 1024) {
+      if (body.length > maxBytes) {
         req.destroy();
+        reject(new Error("Request too large"));
       }
     });
     req.on("end", () => {
